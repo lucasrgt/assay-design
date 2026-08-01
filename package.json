@@ -1,6 +1,6 @@
 {
   "name": "assay-design",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Declarative design-system contracts verified by AVP across code, Storybook, and Figma.",
   "type": "module",
   "license": "MIT",
