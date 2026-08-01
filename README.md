@@ -13,12 +13,14 @@ The three design surfaces have deliberately different jobs:
 ## Start
 
 ```sh
-npm install -D assay-design
+npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.1.3/assay-design-0.1.3.tgz
 npx assay-design init
 npx assay-design doctor
 npx assay-design context
 npx assay-design check --evidence evidence.json
 ```
+
+The release asset is an ordinary `npm pack` tarball and is the current canonical distribution. The package name remains `assay-design`; registry publication can use the same artifact when npm credentials are configured.
 
 `contract.toml` declares Atomic Design tiers, variants, states, slots, semantic icon intents, action/text/hierarchy policy, and required surface coverage. `*.tokens.json` files use the [Design Tokens Community Group](https://www.designtokens.org/) `$type`/`$value` shape.
 
