@@ -12,7 +12,7 @@ export const mcpOperations = {
 };
 
 export function createMcpServer(defaultContract = '.design/contract.toml'): McpServer {
-  const server = new McpServer({ name: 'assay-design', version: '0.1.1' });
+  const server = new McpServer({ name: 'assay-design', version: '0.1.2' });
   const pathSchema = z.object({ contract: z.string().optional() });
   server.registerTool('design_context', { description: 'Return the compact agent context and Agent First Graph projection.', inputSchema: pathSchema, annotations: { readOnlyHint: true, idempotentHint: true } }, async ({ contract }) => result(await mcpOperations.context(contract ?? defaultContract)));
   server.registerTool('design_export', { description: 'Export the canonical design contract as JSON for adapters such as Figma.', inputSchema: pathSchema, annotations: { readOnlyHint: true, idempotentHint: true } }, async ({ contract }) => result(await mcpOperations.export(contract ?? defaultContract)));
