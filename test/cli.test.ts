@@ -36,7 +36,7 @@ describe('CLI', () => {
     expect(await runCli(['export', '--contract', contract, '--out', exported], io)).toBe(0);
     expect(JSON.parse(await readFile(exported, 'utf8')).name).toBe('my-design-system');
     const evidence = join(root, 'evidence.json');
-    await writeFile(evidence, JSON.stringify({ surface: 'example', nodes: [{ component: 'button', variant: 'primary', state: 'default', role: 'button', text: 'Create', slots: ['label'] }], coverage: { states: ['default'], themes: ['light', 'dark'], viewports: ['mobile', 'desktop'], locales: ['en'] } }));
+    await writeFile(evidence, JSON.stringify({ surface: 'example', nodes: [{ component: 'page-shell' }, { component: 'toolbar', parent: 0 }, { component: 'action-group', parent: 1 }, { component: 'button', parent: 2, variant: 'primary', state: 'default', role: 'button', text: 'Create', slots: ['label'] }], coverage: { states: ['default'], themes: ['light', 'dark'], viewports: ['mobile', 'desktop'], locales: ['en'] } }));
     output = [];
     expect(await runCli(['check', '--contract', contract, '--evidence', evidence], io)).toBe(0);
     expect(JSON.parse(output[0]!).outcome).toBe('pass');

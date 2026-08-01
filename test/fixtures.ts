@@ -23,15 +23,20 @@ required_slots = ["label"]
 [[components]]
 name = "card"
 tier = "molecule"
+parts = ["button", "text"]
 required_slots = ["content"]
 [[components]]
 name = "text"
 tier = "atom"
 roles = ["heading", "body"]
+[[components]]
+name = "shell"
+tier = "template"
+parts = ["card"]
 [[surfaces]]
 name = "dashboard"
 template = "shell"
-required_components = ["button", "card", "text"]
+required_components = ["shell", "button", "card", "text"]
 states = ["default", "empty"]
 themes = ["light", "dark"]
 viewports = ["mobile", "desktop"]
@@ -42,9 +47,10 @@ export const contract = (): DesignContract => ({ ...parseContract(source), token
 export const evidence = (): DesignEvidence => ({
   surface: 'dashboard',
   nodes: [
-    { component: 'text', role: 'heading', headingLevel: 1, text: 'Dashboard' },
-    { component: 'card', slots: ['content'] },
-    { component: 'button', variant: 'primary', state: 'default', role: 'button', action: 'primary', region: 'toolbar', text: 'Create project', slots: ['label'], tokens: ['color.action.primary'] },
+    { component: 'shell' },
+    { component: 'card', parent: 0, slots: ['content'] },
+    { component: 'text', parent: 1, role: 'heading', headingLevel: 1, text: 'Dashboard' },
+    { component: 'button', parent: 1, variant: 'primary', state: 'default', role: 'button', action: 'primary', region: 'toolbar', text: 'Create project', slots: ['label'], tokens: ['color.action.primary'] },
   ],
   coverage: { states: ['default', 'empty'], themes: ['light', 'dark'], viewports: ['mobile', 'desktop'], locales: ['en', 'pt-BR'] },
 });

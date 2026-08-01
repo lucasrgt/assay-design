@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "benchmark": "assay-design-multidomain-stress",
+  "version": "0.2.0",
+  "corpus": {
+    "subjects": 1024,
+    "domains": 8,
+    "corrected": 512,
+    "vulnerable": 512,
+    "avpCriterionVerdicts": 5120
+  },
+  "accuracy": {
+    "expectedFailures": 512,
+    "detectedFailures": 512,
+    "missedFailures": 0,
+    "falseAlarms": 0,
+    "unexpectedResults": 0
+  },
+  "determinism": {
+    "runs": 100,
+    "drift": 0
+  },
+  "scale": {
+    "nodes": 50000,
+    "findings": 0,
+    "durationMs": 24.22,
+    "nodesPerSecond": 2064401.06
+  },
+  "performance": {
+    "durationMs": 44.22,
+    "subjectsPerSecond": 23154.48,
+    "heapDeltaBytes": 10942264
+  },
+  "passed": true,
+  "limitations": [
+    "The corpus is deterministic and synthetic.",
+    "Timing is observational and is not a cross-machine pass threshold.",
+    "The stress test exercises Evidence IR plus AVP verdict aggregation, not Figma or browser rendering latency."
+  ]
+}

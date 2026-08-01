@@ -13,7 +13,7 @@ The three design surfaces have deliberately different jobs:
 ## Start
 
 ```sh
-npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.1.3/assay-design-0.1.3.tgz
+npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.2.0/assay-design-0.2.0.tgz
 npx assay-design init
 npx assay-design doctor
 npx assay-design context
@@ -22,7 +22,9 @@ npx assay-design check --evidence evidence.json
 
 The release asset is an ordinary `npm pack` tarball and is the current canonical distribution. The package name remains `assay-design`; registry publication can use the same artifact when npm credentials are configured.
 
-`contract.toml` declares Atomic Design tiers, variants, states, slots, semantic icon intents, action/text/hierarchy policy, and required surface coverage. `*.tokens.json` files use the [Design Tokens Community Group](https://www.designtokens.org/) `$type`/`$value` shape.
+`contract.toml` makes Atomic Design executable rather than decorative. Components declare `atom`, `molecule`, `organism`, or `template` plus their allowed `parts`; atoms cannot compose components, lower tiers cannot contain higher tiers, cycles and unknown parts are rejected, and every surface can bind a declared template. Pages live as `surface` contracts because they are product instances, not reusable design-system components. Same-tier composition is allowed only when explicitly declared, which supports practical nested organisms without abandoning the hierarchy.
+
+The DOM collector records the nearest design-component parent in the common Evidence IR. AVP therefore verifies the rendered hierarchy as well as variants, states, roles, slots, semantic icon intents, action/text/heading policies, DTCG tokens, and required surface coverage. Frameworks that do not expose a DOM can emit the same `parent` indices directly.
 
 Rendered elements expose a language-neutral evidence seam. Existing `data-ui` conventions are accepted as an alias:
 
@@ -66,3 +68,9 @@ Build the package, then import [`figma/manifest.json`](./figma/manifest.json) as
 ## Mini harness
 
 `npm run check` enforces typecheck, lint, tests, package entrypoints, runtime source ≤500 LOC, every file ≤500 LOC, ≥95% line/statement/function coverage, and ≥90% branch coverage. CI runs it on Linux, Windows, and macOS with Node 24.
+
+## Benchmarks
+
+`npm run benchmark` calibrates the five AVP design criteria across analytics, commerce, healthcare, fintech, government, media, education, and travel, then stresses 1,024 and 10,000 mixed corrected/vulnerable subjects plus a 50,000-node surface. The committed v0.2.0 run detected all 40 isolated domain mutants with zero misses and zero false alarms; the 10,000-subject run preserved all 50,000 AVP criterion verdicts with zero drift. See the [protocol and reports](./benchmarks/README.md).
+
+These measurements prove deterministic contract conformance and engine integrity. They deliberately do not claim that static rules can measure subjective beauty, user research, browser geometry, or assistive-technology behavior; those remain separate AVP probes.

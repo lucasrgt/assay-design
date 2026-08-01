@@ -4,7 +4,7 @@ import { parse } from 'smol-toml';
 type Dict = Record<string, unknown>;
 export type Tier = 'atom' | 'molecule' | 'organism' | 'template';
 export type FindingCategory = 'components' | 'properties' | 'composition' | 'semantics' | 'coverage';
-export interface ComponentContract { name: string; tier: Tier; variants: string[]; states: string[]; roles: string[]; requiredSlots: string[] }
+export interface ComponentContract { name: string; tier: Tier; parts: string[]; variants: string[]; states: string[]; roles: string[]; requiredSlots: string[] }
 export interface SurfaceContract { name: string; template?: string; requiredComponents: string[]; states: string[]; themes: string[]; viewports: string[]; locales: string[] }
 export interface DesignContract {
   schema: 1; name: string; tokenFiles: string[]; components: ComponentContract[]; surfaces: SurfaceContract[];
@@ -13,7 +13,7 @@ export interface DesignContract {
 }
 export interface EvidenceNode {
   component: string; variant?: string; state?: string; role?: string; action?: string; icon?: string; iconIntent?: string;
-  text?: string; region?: string; headingLevel?: number; tokens?: string[]; slots?: string[];
+  text?: string; region?: string; headingLevel?: number; tokens?: string[]; slots?: string[]; parent?: number;
 }
 export interface DesignEvidence {
   surface: string; source?: string; nodes: EvidenceNode[]; tokens?: string[];
@@ -35,6 +35,7 @@ const text = (value: unknown, label: string): string => {
   return value;
 };
 const optionalText = (value: unknown, label: string): string | undefined => value === undefined ? undefined : text(value, label);
+const tiers: Tier[] = ['atom', 'molecule', 'organism', 'template'];
 
 export function parseContract(source: string): DesignContract {
   const raw = record(parse(source), 'contract');
@@ -47,10 +48,10 @@ export function parseContract(source: string): DesignContract {
     const row = record(value, `components[${index}]`);
     const name = text(row.name, `components[${index}].name`);
     const tier = text(row.tier, `components[${index}].tier`) as Tier;
-    if (!['atom', 'molecule', 'organism', 'template'].includes(tier)) throw new Error(`${name}.tier is not an Atomic Design tier`);
+    if (!tiers.includes(tier)) throw new Error(`${name}.tier is not an Atomic Design tier`);
     if (seen.has(name)) throw new Error(`component ${name} is declared twice`);
     seen.add(name);
-    return { name, tier, variants: strings(row.variants, `${name}.variants`), states: strings(row.states, `${name}.states`), roles: strings(row.roles, `${name}.roles`), requiredSlots: strings(row.required_slots, `${name}.required_slots`) };
+    return { name, tier, parts: strings(row.parts, `${name}.parts`), variants: strings(row.variants, `${name}.variants`), states: strings(row.states, `${name}.states`), roles: strings(row.roles, `${name}.roles`), requiredSlots: strings(row.required_slots, `${name}.required_slots`) };
   });
   const surfaces = surfaceRows.map((value, index): SurfaceContract => {
     const row = record(value, `surfaces[${index}]`);
@@ -58,6 +59,29 @@ export function parseContract(source: string): DesignContract {
     const template = optionalText(row.template, `${name}.template`);
     return { name, ...(template ? { template } : {}), requiredComponents: strings(row.required_components, `${name}.required_components`), states: strings(row.states, `${name}.states`), themes: strings(row.themes, `${name}.themes`), viewports: strings(row.viewports, `${name}.viewports`), locales: strings(row.locales, `${name}.locales`) };
   });
+  const componentByName = new Map(components.map((component) => [component.name, component]));
+  for (const component of components) for (const part of component.parts) {
+    const child = componentByName.get(part);
+    if (!child) throw new Error(`${component.name}.parts references undeclared component "${part}"`);
+    if (component.tier === 'atom' || tiers.indexOf(child.tier) > tiers.indexOf(component.tier)) throw new Error(`${component.name} cannot compose ${child.tier} "${part}"`);
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (name: string): void => {
+    if (visiting.has(name)) throw new Error(`Atomic Design composition cycle includes "${name}"`);
+    if (visited.has(name)) return;
+    visiting.add(name);
+    for (const part of componentByName.get(name)?.parts ?? []) visit(part);
+    visiting.delete(name); visited.add(name);
+  };
+  for (const component of components) visit(component.name);
+  const surfaceNames = new Set<string>();
+  for (const surface of surfaces) {
+    if (surfaceNames.has(surface.name)) throw new Error(`surface ${surface.name} is declared twice`);
+    surfaceNames.add(surface.name);
+    if (surface.template && componentByName.get(surface.template)?.tier !== 'template') throw new Error(`${surface.name}.template must reference a declared template`);
+    for (const required of surface.requiredComponents) if (!componentByName.has(required)) throw new Error(`${surface.name}.required_components references undeclared component "${required}"`);
+  }
   const policies = raw.policies === undefined ? {} : record(raw.policies, 'policies');
   const icons = Object.fromEntries(Object.entries(raw.icons === undefined ? {} : record(raw.icons, 'icons')).map(([intent, value]) => [intent, strings(record(value, `icons.${intent}`).allowed, `icons.${intent}.allowed`)]));
   const links = Object.fromEntries(Object.entries(raw.links === undefined ? {} : record(raw.links, 'links')).map(([relation, value]) => [relation, strings(value, `links.${relation}`)]));
@@ -81,6 +105,14 @@ export function inspectEvidence(contract: DesignContract, evidence: DesignEviden
     const path = `nodes[${index}]`;
     const spec = components.get(node.component);
     if (!spec) return add('components', path, `Use a declared component instead of "${node.component}"`);
+    if (node.parent !== undefined) {
+      if (!Number.isInteger(node.parent) || node.parent < 0 || node.parent >= evidence.nodes.length || node.parent === index) add('composition', `${path}.parent`, `Parent index "${node.parent}" is invalid`);
+      else {
+        const parent = components.get(evidence.nodes[node.parent]!.component);
+        if (parent && (parent.tier === 'atom' || tiers.indexOf(spec.tier) > tiers.indexOf(parent.tier))) add('composition', `${path}.parent`, `${parent.tier} "${parent.name}" cannot contain ${spec.tier} "${spec.name}"`);
+        else if (parent?.parts.length && !parent.parts.includes(spec.name)) add('composition', `${path}.parent`, `${parent.name} does not declare "${spec.name}" as a part`);
+      }
+    }
     for (const [property, value, allowed] of [['variant', node.variant, spec.variants], ['state', node.state, spec.states], ['role', node.role, spec.roles]] as const) {
       if (value && !allowed.includes(value)) add('properties', `${path}.${property}`, `"${value}" is outside ${node.component}.${property}s`);
     }
@@ -103,7 +135,7 @@ export function inspectEvidence(contract: DesignContract, evidence: DesignEviden
   for (const token of evidence.tokens ?? []) if (contract.tokenNames && !contract.tokenNames.includes(token)) add('coverage', 'tokens', `Token "${token}" is not in the DTCG sources`);
   if (!surface) add('coverage', 'surface', `Surface "${evidence.surface}" is not declared`);
   else {
-    for (const component of missing(evidence.nodes.map((node) => node.component), surface.requiredComponents)) add('coverage', 'surface', `Surface requires component "${component}"`);
+    for (const component of missing(evidence.nodes.map((node) => node.component), [...new Set([...surface.requiredComponents, ...(surface.template ? [surface.template] : [])])])) add('coverage', 'surface', `Surface requires component "${component}"`);
     for (const axis of ['states', 'themes', 'viewports', 'locales'] as const) for (const value of missing(evidence.coverage?.[axis], surface[axis])) add('coverage', `coverage.${axis}`, `Missing ${axis.slice(0, -1)} "${value}"`);
   }
   return findings;
@@ -114,7 +146,7 @@ const designArchetype = archetype('design-system-conformance', '0.1.0', () => {
   const check = (id: FindingCategory, statement: string) => criterion(`design.${id}`, statement, { substrate: 'static' }, mechanical<DesignExpect>(({ expect }) => expect.clear(id)));
   check('components', 'Every rendered component belongs to the design-system vocabulary');
   check('properties', 'Component variants, states, and roles are declared');
-  check('composition', 'Required component slots are present');
+  check('composition', 'Atomic hierarchy, declared parts, and required slots are respected');
   check('semantics', 'Content, action hierarchy, headings, and icons follow policy');
   check('coverage', 'Surfaces and tokens satisfy their declared coverage');
 });
@@ -129,6 +161,7 @@ export function verifyEvidence(contract: DesignContract, evidence: DesignEvidenc
 export function collectDocument(root: ParentNode, surface: string, coverage?: DesignEvidence['coverage']): DesignEvidence {
   const selector = '[data-ds],[data-ui]';
   const elements = [...(root instanceof Element && root.matches(selector) ? [root] : []), ...root.querySelectorAll(selector)];
+  const indices = new Map(elements.map((element, index) => [element, index]));
   const nodes = elements.map((element): EvidenceNode => {
     const value = (name: string) => element.getAttribute(`data-ds-${name}`) ?? element.getAttribute(`data-ui-${name}`) ?? element.getAttribute(`data-${name}`) ?? undefined;
     const component = element.getAttribute('data-ds') ?? element.getAttribute('data-ui') ?? '';
@@ -138,7 +171,9 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
     const slots = [...element.querySelectorAll('[data-ds-slot],[data-ui-slot]')].map((slot) => slot.getAttribute('data-ds-slot') ?? slot.getAttribute('data-ui-slot') ?? '').filter(Boolean);
     const headingLevel = /^H[1-6]$/.test(element.tagName) ? Number(element.tagName[1]) : undefined;
     const tokens = value('token')?.split(/\s+/).filter(Boolean);
-    return { component, ...(variant ? { variant } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}) };
+    const parent = element.parentElement?.closest(selector);
+    const parentIndex = parent ? indices.get(parent) : undefined;
+    return { component, ...(variant ? { variant } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}), ...(parentIndex !== undefined ? { parent: parentIndex } : {}) };
   });
   return { surface, nodes, ...(coverage ? { coverage } : {}) };
 }
@@ -150,7 +185,7 @@ export function designContext(contract: DesignContract) {
     contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, policies: contract.policies, tokens: contract.tokenNames ?? contract.tokenFiles },
     graph: {
       nodes: [{ uri: root, kind: 'design-contract' }, ...contract.components.map((item) => ({ uri: `design://component/${encodeURIComponent(item.name)}`, kind: item.tier }))],
-      edges: [...contract.components.map((item) => ({ from: root, relation: 'contains', to: `design://component/${encodeURIComponent(item.name)}` })), ...Object.entries(contract.links).flatMap(([relation, targets]) => targets.map((to) => ({ from: root, relation, to })))],
+      edges: [...contract.components.map((item) => ({ from: root, relation: 'contains', to: `design://component/${encodeURIComponent(item.name)}` })), ...contract.components.flatMap((item) => item.parts.map((part) => ({ from: `design://component/${encodeURIComponent(item.name)}`, relation: 'composes', to: `design://component/${encodeURIComponent(part)}` }))), ...Object.entries(contract.links).flatMap(([relation, targets]) => targets.map((to) => ({ from: root, relation, to })))],
     },
   };
 }

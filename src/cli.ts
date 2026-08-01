@@ -29,9 +29,25 @@ states = ["default", "disabled", "loading"]
 roles = ["button"]
 required_slots = ["label"]
 
+[[components]]
+name = "action-group"
+tier = "molecule"
+parts = ["button"]
+
+[[components]]
+name = "toolbar"
+tier = "organism"
+parts = ["action-group"]
+
+[[components]]
+name = "page-shell"
+tier = "template"
+parts = ["toolbar"]
+
 [[surfaces]]
 name = "example"
-required_components = ["button"]
+template = "page-shell"
+required_components = ["page-shell", "toolbar", "action-group", "button"]
 states = ["default"]
 themes = ["light", "dark"]
 viewports = ["mobile", "desktop"]
