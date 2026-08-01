@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>body{font:12px Inter,sans-serif;margin:16px}textarea,pre{box-sizing:border-box;width:100%;height:280px}button{margin:8px 8px 8px 0;padding:8px 12px}pre{overflow:auto;white-space:pre-wrap}</style>
+<h2>Assay Design</h2>
+<p>Paste <code>assay-design export</code> JSON. The Git contract remains canonical.</p>
+<textarea id="contract" placeholder="Compiled contract JSON"></textarea>
+<button id="verify">Verify page</button><button id="scan">Export evidence</button>
+<pre id="result" aria-live="polite"></pre>
+<script>
+const contract=document.querySelector('#contract'),result=document.querySelector('#result');
+const send=type=>{try{parent.postMessage({pluginMessage:{type,...(type==='verify'?{contract:JSON.parse(contract.value)}:{})}},'*')}catch(error){result.textContent=error.message}};
+document.querySelector('#verify').onclick=()=>send('verify');document.querySelector('#scan').onclick=()=>send('scan');
+onmessage=({data})=>{const message=data.pluginMessage;if(message)result.textContent=JSON.stringify(message.verdict??message.evidence??message.message,null,2)};
+</script>
+</html>
