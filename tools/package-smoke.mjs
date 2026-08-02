@@ -12,5 +12,9 @@ for (const name of ['parseContract', 'loadContract', 'inspectEvidence', 'verifyE
 const figmaBundle = await readFile('dist/figma.js', 'utf8');
 if (/node:fs|fs\/promises|require\(/.test(figmaBundle)) throw new Error('Figma bundle is not browser-safe');
 if (Buffer.byteLength(figmaBundle) > 20_000) throw new Error('Figma bundle pulled code beyond the protocol core');
+const managerBundle = await readFile('dist/storybook/manager.js', 'utf8');
+const managerChunks = [...managerBundle.matchAll(/from\s+["']\.\.\/(chunk-[^"']+\.js)["']/g)];
+const managerGraph = managerBundle + await Promise.all(managerChunks.map((match) => readFile(`dist/${match[1]}`, 'utf8')));
+if (/storybook\/(?:preview-api|internal\/csf)/.test(managerGraph)) throw new Error('Storybook manager pulled preview-only APIs');
 if (!execFileSync(process.execPath, ['dist/cli.js', '--help'], { encoding: 'utf8' }).includes('Usage: assay-design')) throw new Error('CLI binary did not execute');
 console.log(JSON.stringify({ ok: true, files: packed.files.length, size: packed.size }));

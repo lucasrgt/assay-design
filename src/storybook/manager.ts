@@ -3,7 +3,7 @@ import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, Compon
 import { Badge, Button, EmptyTabContent, IconButton, TabButton } from 'storybook/internal/components';
 import { addons, types, useAddonState, useChannel, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
-import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryImplementation, type DesignStoryReference } from './preview.js';
+import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryImplementation, type DesignStoryReference } from './shared.js';
 
 const TAB_ID = `${ADDON_ID}/tab`;
 const COMPOSITION_VIEW = '$composition';

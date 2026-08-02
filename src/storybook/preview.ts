@@ -1,10 +1,9 @@
 import { definePreviewAddon } from 'storybook/internal/csf';
 import { addons } from 'storybook/preview-api';
 import { collectDocument, verifyEvidence, type DesignContract } from '../index.js';
-
-export const ADDON_ID = 'assay-design';
-export const VERDICT_EVENT = `${ADDON_ID}/verdict`;
-export const REQUEST_EVENT = `${ADDON_ID}/request`;
+import { REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryControls, type DesignStoryMap } from './shared.js';
+export { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT } from './shared.js';
+export type { DesignPanelPayload, DesignStoryControls, DesignStoryImplementation, DesignStoryMap, DesignStoryReference, StoryArgs } from './shared.js';
 
 type Channel = {
   emit(event: string, payload?: unknown): void;
@@ -15,18 +14,6 @@ type Channel = {
 let connectedChannel: Channel | undefined;
 let emitLatest: (() => void) | undefined;
 const answerRequest = () => emitLatest?.();
-export type StoryArgs = Record<string, string | number | boolean | null>;
-export type DesignStoryControls = Partial<Record<'variants' | 'states' | 'widths', Record<string, StoryArgs>>>;
-export type DesignStoryImplementation = { id: string; label?: string; platform?: string; controls?: DesignStoryControls };
-export type DesignStoryReference = string | DesignStoryImplementation | readonly DesignStoryImplementation[];
-export type DesignStoryMap = Record<string, DesignStoryReference>;
-
-export type DesignPanelPayload = Awaited<ReturnType<typeof verifyEvidence>> & {
-  contract: Pick<DesignContract, 'name' | 'components' | 'surfaces'>;
-  evidence: ReturnType<typeof collectDocument>;
-  stories: DesignStoryMap;
-  controls?: Record<string, DesignStoryControls>;
-};
 
 export async function evaluateStory(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2]) {
   return verifyEvidence(contract, collectDocument(document, surface, coverage));
