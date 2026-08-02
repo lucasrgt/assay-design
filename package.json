@@ -51,6 +51,7 @@
     "benchmark": "npm run build && node benchmarks/run.mjs",
     "storybook": "npm run build && storybook dev -p 6006 --host 127.0.0.1 --no-open",
     "storybook:build": "npm run build && storybook build",
+    "storybook:serve": "node tools/serve-storybook.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run test:package && npm run harness",
     "prepublishOnly": "npm run check"
   },
