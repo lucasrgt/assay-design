@@ -55,6 +55,7 @@ const styles = {
   componentMetaChip: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, marginRight: 3, padding: '4px 7px', borderRadius: 20, fontFamily: 'var(--ad-font)', fontSize: 10, fontWeight: 600, lineHeight: '12px', letterSpacing: 0 },
   previewFrame: { position: 'relative' as const, display: 'flex', flex: '1 1 auto', minHeight: 0 },
   preview: { display: 'block', flex: '1 1 auto', width: '100%', minHeight: 'calc(100vh - 154px)', border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
+  emptyPreview: { display: 'flex', flex: '1 1 auto', alignItems: 'center', justifyContent: 'center', minWidth: 0, minHeight: 'calc(100vh - 154px)' },
   previewAction: { position: 'absolute' as const, top: 8, right: 8, zIndex: 2, border: '1px solid var(--ad-line)', background: 'var(--ad-panel)' },
 };
 
@@ -203,7 +204,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory }: { payload: D
     element('div', { style: styles.previewFrame },
       story
         ? element('iframe', { title: `${component.name} canonical story`, src: source, style: styles.preview })
-        : element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' }),
+        : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' })),
       story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}${query ? `&args=${encodeURIComponent(query)}` : ''}${globals ? `&globals=${encodeURIComponent(globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
   );
