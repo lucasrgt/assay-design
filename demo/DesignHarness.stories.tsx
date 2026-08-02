@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { parseContract } from '../src/index.js';
 
-const canonicalStories = {
+export const canonicalStories = {
   button: 'assay-design-canonical-components--button',
   text: 'assay-design-canonical-components--text',
   badge: 'assay-design-canonical-components--badge',
@@ -80,6 +80,9 @@ states = ["default"]
 themes = ["dark"]
 viewports = ["desktop"]
 locales = ["en"]
+
+[[surfaces]]
+name = "canonical-component"
 `),
   tokens: {
     'color.canvas': '#08110f',
@@ -163,7 +166,7 @@ export function ContractStory({ inconsistent = false }: { inconsistent?: boolean
 const meta = {
   title: 'Assay Design/Contract Workbench',
   component: ContractStory,
-  excludeStories: ['showcaseContract', 'ContractStory'],
+  excludeStories: ['canonicalStories', 'showcaseContract', 'ContractStory'],
   parameters: {
     designHarness: {
       contract: showcaseContract,

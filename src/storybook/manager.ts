@@ -1,7 +1,7 @@
 import React, { type CSSProperties } from 'react';
 import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, GridIcon, StructureIcon } from '@storybook/icons';
 import { Badge, Button, EmptyTabContent, Link, TabButton } from 'storybook/internal/components';
-import { addons, types, useChannel, useStorybookApi, useStorybookState } from 'storybook/manager-api';
+import { addons, types, useAddonState, useChannel, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
 
@@ -212,13 +212,20 @@ const cachePayload = (payload: DesignPanelPayload) => {
 function DesignPage() {
   const theme = useTheme();
   const [payload, setPayload] = React.useState(cachedPayload);
+  const [persistedPayload, setPersistedPayload] = useAddonState<DesignPanelPayload | undefined>(`${ADDON_ID}/last-payload`, undefined);
   const emit = useChannel({});
   React.useEffect(() => {
-    subscribers.add(setPayload);
+    const update = (next: DesignPanelPayload) => {
+      setPayload(next);
+      setPersistedPayload(next, { persistence: 'session' });
+    };
+    subscribers.add(update);
+    if (cachedPayload) update(cachedPayload);
     emit(REQUEST_EVENT);
-    return () => { subscribers.delete(setPayload); };
-  }, [emit]);
-  return payload ? element(Workbench, { payload }) : element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } }, element(EmptyTabContent, { title: 'No live design evidence', description: 'Open a story with parameters.designHarness, then return to Design Contract.' }));
+    return () => { subscribers.delete(update); };
+  }, [emit, setPersistedPayload]);
+  const visiblePayload = payload ?? persistedPayload;
+  return visiblePayload ? element(Workbench, { payload: visiblePayload }) : element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } }, element(EmptyTabContent, { title: 'No live design evidence', description: 'Open a story with parameters.designHarness, then return to Design Contract.' }));
 }
 
 addons.register(ADDON_ID, () => {

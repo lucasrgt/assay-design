@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
+import { canonicalStories, showcaseContract } from './DesignHarness.stories.js';
 
 function Canvas({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return <main className={wide ? 'canonical-canvas canonical-canvas-wide' : 'canonical-canvas'}>{children}</main>;
@@ -14,7 +15,18 @@ const CardSubject = () => <article className="component-card canonical-card" dat
 const NavigationSubject = () => <nav className="product-nav canonical-nav" data-ds="navigation"><div className="brand"><i />ASSAY DESIGN</div><span data-ds="text" data-role="body">Design operations</span><button data-ds="button" data-variant="secondary" data-state="default" data-role="button"><span data-ds-slot="label">View contract</span></button></nav>;
 const GridSubject = () => <section className="canonical-grid" data-ds="dashboard-grid"><TextSubject /><SearchSubject /><CardSubject /></section>;
 
-const meta = { title: 'Assay Design/Canonical Components', parameters: { layout: 'fullscreen' } } satisfies Meta;
+const meta = {
+  title: 'Assay Design/Canonical Components',
+  parameters: {
+    layout: 'fullscreen',
+    designHarness: {
+      contract: showcaseContract,
+      surface: 'canonical-component',
+      stories: canonicalStories,
+      coverage: { states: [], themes: [], viewports: [], locales: [] },
+    },
+  },
+} satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
