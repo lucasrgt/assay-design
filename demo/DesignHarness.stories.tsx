@@ -13,6 +13,14 @@ export const canonicalStories = {
   'application-shell': 'assay-design-canonical-components--application-shell',
 };
 
+export const canonicalControls = {
+  button: {
+    variants: { primary: { variant: 'primary' }, secondary: { variant: 'secondary' } },
+    states: { default: { state: 'default' }, disabled: { state: 'disabled' } },
+  },
+  badge: { variants: { neutral: { variant: 'neutral' }, positive: { variant: 'positive' } } },
+};
+
 export const showcaseContract = {
   ...parseContract(`schema = 1
 name = "assay-showcase"
@@ -172,6 +180,7 @@ const meta = {
       contract: showcaseContract,
       surface: 'design-overview',
       stories: canonicalStories,
+      controls: canonicalControls,
       coverage: { states: ['default'], themes: ['dark'], viewports: ['desktop'], locales: ['en'] },
     },
   },
@@ -183,5 +192,5 @@ type Story = StoryObj<typeof meta>;
 export const Conformant: Story = {};
 export const Inconsistent: Story = {
   args: { inconsistent: true },
-  parameters: { designHarness: { contract: showcaseContract, surface: 'design-overview', stories: canonicalStories, coverage: { states: ['default'], themes: [], viewports: [], locales: ['en'] } } },
+  parameters: { designHarness: { contract: showcaseContract, surface: 'design-overview', stories: canonicalStories, controls: canonicalControls, coverage: { states: ['default'], themes: [], viewports: [], locales: ['en'] } } },
 };

@@ -15,20 +15,23 @@ type Channel = {
 let connectedChannel: Channel | undefined;
 let emitLatest: (() => void) | undefined;
 const answerRequest = () => emitLatest?.();
+export type StoryArgs = Record<string, string | number | boolean | null>;
+export type DesignStoryControls = Partial<Record<'variants' | 'states', Record<string, StoryArgs>>>;
 
 export type DesignPanelPayload = Awaited<ReturnType<typeof verifyEvidence>> & {
   contract: Pick<DesignContract, 'name' | 'components' | 'surfaces'>;
   evidence: ReturnType<typeof collectDocument>;
   stories: Record<string, string>;
+  controls: Record<string, DesignStoryControls>;
 };
 
 export async function evaluateStory(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2]) {
   return verifyEvidence(contract, collectDocument(document, surface, coverage));
 }
 
-export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: Record<string, string> = {}): Promise<DesignPanelPayload> {
+export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: Record<string, string> = {}, controls: Record<string, DesignStoryControls> = {}): Promise<DesignPanelPayload> {
   const evidence = collectDocument(document, surface, coverage);
-  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces }, evidence, stories };
+  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces }, evidence, stories, controls };
 }
 
 export function publishStoryPanel(channel: Channel, evaluate: () => Promise<DesignPanelPayload>) {
@@ -44,8 +47,8 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
 export default definePreviewAddon({
   decorators: [
     (Story, context, channel: Channel = addons.getChannel()) => {
-      const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: Record<string, string> } | undefined;
-      if (settings?.contract && settings.surface) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories));
+      const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: Record<string, string>; controls?: Record<string, DesignStoryControls> } | undefined;
+      if (settings?.contract && settings.surface) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls));
       return Story();
     },
   ],

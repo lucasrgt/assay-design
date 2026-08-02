@@ -105,7 +105,14 @@ const componentIssues = (payload: DesignPanelPayload, name: string) => {
   return findingsOf(payload).filter((finding) => [...indexes].some((index) => finding.path === `nodes[${index}]` || finding.path.startsWith(`nodes[${index}].`)));
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
-const metadataChips = (values: readonly string[], color: string) => values.map((value) => element('span', { key: value, style: { ...styles.componentMetaChip, color, background: `color-mix(in srgb, ${color} 10%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 25%, transparent)` } }, displayName(value)));
+const metadataChips = (values: readonly string[], color: string, selected?: string, onSelect?: (value: string) => void) => values.map((value) => {
+  const active = selected === value;
+  const style = { ...styles.componentMetaChip, color, background: `color-mix(in srgb, ${color} ${active ? 24 : 10}%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} ${active ? 55 : 25}%, transparent)`, ...(onSelect ? { border: 0, cursor: 'pointer' } : {}) };
+  return onSelect
+    ? element('button', { key: value, type: 'button', style, 'aria-pressed': active, onClick: () => onSelect(value) }, displayName(value))
+    : element('span', { key: value, style }, displayName(value));
+});
+const argsQuery = (args: Record<string, string | number | boolean | null>) => Object.entries(args).map(([key, value]) => `${key}:${String(value)}`).join(';');
 const tierBadge = (tier: (typeof tiers)[number], compact = false) => {
   const TierIcon = tierIcons[tier];
   const iconSize = compact ? tier === 'atom' ? 12 : 11 : undefined;
@@ -156,25 +163,34 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
 }
 
 function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name: string }) {
+  const [selections, setSelections] = React.useState<Record<string, Record<string, string>>>({});
   if (name === COMPOSITION_VIEW) return element('aside', { style: { ...styles.inspector, padding: 14 } }, element(Composition, { payload }));
   const component = payload.contract.components.find((item) => item.name === name);
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
   const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['slots', component.requiredSlots]];
   const visibleGroups = groups.filter(([, values]) => values.length);
+  const componentSelections = selections[name] ?? {};
+  const controls = payload.controls[name] ?? {};
+  const choose = (group: string, value: string) => setSelections((current) => ({ ...current, [name]: { ...current[name], [group]: value } }));
+  const args = Object.assign({}, ...(['variants', 'states'] as const).map((group) => controls[group]?.[componentSelections[group] ?? component[group][0] ?? ''] ?? {}));
+  const query = argsQuery(args);
+  const source = story ? `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false${query ? `&args=${encodeURIComponent(query)}` : ''}` : '';
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
       visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => {
         const color = metadataColors[label] ?? 'var(--ad-muted)';
-        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color));
+        const control = label === 'variants' || label === 'states' ? controls[label] : undefined;
+        const selected = control ? componentSelections[label] ?? values[0] : undefined;
+        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color, selected, control ? (value) => choose(label, value) : undefined));
       })) : null,
     ),
     element('div', { style: styles.previewFrame },
       story
-        ? element('iframe', { title: `${component.name} canonical story`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false`, style: styles.preview })
+        ? element('iframe', { title: `${component.name} canonical story`, src: source, style: styles.preview })
         : element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' }),
-      story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
+      story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}${query ? `&args=${encodeURIComponent(query)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
   );
 }

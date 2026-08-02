@@ -150,13 +150,19 @@ export const Default = {
         button: 'design-system-atoms-button--primary',
         card: 'design-system-molecules-card--default',
       },
+      controls: {
+        button: {
+          variants: { primary: { variant: 'primary' }, secondary: { variant: 'secondary' } },
+          states: { default: { disabled: false }, disabled: { disabled: true } },
+        },
+      },
       coverage: { states: ['default'] },
     },
   },
 };
 ```
 
-The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. The addon is optional; Assay Design does not install or replace Storybook.
+The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. Explicit `controls` bind contract variants and states to real Storybook args; those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
 
 The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
 

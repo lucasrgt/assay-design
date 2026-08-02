@@ -11,10 +11,11 @@ describe('Storybook workbench showcase', () => {
 
   it('derives a green inventory from the conformant rendered story', async () => {
     document.body.innerHTML = renderToStaticMarkup(React.createElement(ContractStory));
-    const payload = await evaluateStoryPanel(showcaseContract, 'design-overview', coverage, showcaseMeta.parameters.designHarness.stories);
+    const payload = await evaluateStoryPanel(showcaseContract, 'design-overview', coverage, showcaseMeta.parameters.designHarness.stories, showcaseMeta.parameters.designHarness.controls);
     expect(payload.outcome).toBe('pass');
     expect(payload.contract.components).toHaveLength(9);
     expect(Object.keys(payload.stories)).toHaveLength(9);
+    expect(payload.controls).toMatchObject({ button: { states: { disabled: { state: 'disabled' } } } });
     expect(new Set(payload.evidence.nodes.map((node) => node.component))).toEqual(new Set(payload.contract.components.map((component) => component.name)));
   });
 

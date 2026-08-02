@@ -1,14 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
-import { canonicalStories, showcaseContract } from './DesignHarness.stories.js';
+import { canonicalControls, canonicalStories, showcaseContract } from './DesignHarness.stories.js';
 
 function Canvas({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return <main className={wide ? 'canonical-canvas canonical-canvas-wide' : 'canonical-canvas'}>{children}</main>;
 }
 
-const ButtonSubject = () => <button className="primary" data-ds="button" data-variant="primary" data-state="default" data-role="button"><span data-ds-slot="label">Inspect component</span></button>;
+type ButtonArgs = { variant: 'primary' | 'secondary'; state: 'default' | 'disabled' };
+type BadgeArgs = { variant: 'neutral' | 'positive' };
+const ButtonSubject = ({ variant = 'primary', state = 'default' }: Partial<ButtonArgs> = {}) => <button className={variant} disabled={state === 'disabled'} data-ds="button" data-variant={variant} data-state={state} data-role="button"><span data-ds-slot="label">Inspect component</span></button>;
 const TextSubject = () => <div><h2 data-ds="text" data-role="heading">Operational clarity</h2><p data-ds="text" data-role="body">Hierarchy and content roles stay consistent across every surface.</p></div>;
-const BadgeSubject = () => <span className="canonical-badge" data-ds="badge" data-variant="positive">Stable</span>;
+const BadgeSubject = ({ variant = 'positive' }: Partial<BadgeArgs> = {}) => <span className={`canonical-badge canonical-badge-${variant}`} data-ds="badge" data-variant={variant}>{variant === 'positive' ? 'Stable' : 'Neutral'}</span>;
 const MetricSubject = () => <div className="metric" data-ds="metric" data-role="status"><strong>98%</strong><span>contract coverage</span></div>;
 const SearchSubject = () => <div className="search-field" data-ds="search-field"><span data-ds="text" data-role="label">Find component</span><input data-ds-slot="field" placeholder="Button, Card, Navigation…" /><button data-ds="button" data-variant="secondary" data-state="default" data-role="button"><span data-ds-slot="label">Filter</span></button></div>;
 const CardSubject = () => <article className="component-card canonical-card" data-ds="card"><div data-ds-slot="content"><div className="card-top"><BadgeSubject /><span data-ds="text" data-role="label">MOLECULE</span></div><TextSubject /><MetricSubject /><ButtonSubject /></div></article>;
@@ -23,6 +25,7 @@ const meta = {
       contract: showcaseContract,
       surface: 'canonical-component',
       stories: canonicalStories,
+      controls: canonicalControls,
       coverage: { states: [], themes: [], viewports: [], locales: [] },
     },
   },
@@ -30,9 +33,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Button: Story = { render: () => <Canvas><ButtonSubject /></Canvas> };
+export const Button: StoryObj<ButtonArgs> = { args: { variant: 'primary', state: 'default' }, render: (args) => <Canvas><ButtonSubject {...args} /></Canvas> };
 export const Text: Story = { render: () => <Canvas><TextSubject /></Canvas> };
-export const Badge: Story = { render: () => <Canvas><BadgeSubject /></Canvas> };
+export const Badge: StoryObj<BadgeArgs> = { args: { variant: 'positive' }, render: (args) => <Canvas><BadgeSubject {...args} /></Canvas> };
 export const Metric: Story = { render: () => <Canvas><MetricSubject /></Canvas> };
 export const SearchField: Story = { render: () => <Canvas><SearchSubject /></Canvas> };
 export const Card: Story = { render: () => <Canvas><CardSubject /></Canvas> };
