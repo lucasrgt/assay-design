@@ -12,7 +12,7 @@ type Finding = { rule: string; category: string; path: string; message: string }
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
 
 const styles = {
-  root: { minHeight: '100vh', width: '100%', padding: '28px 20px 24px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
+  root: { minHeight: '100vh', width: '100%', padding: '56px 20px 24px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, marginBottom: 14 },
   title: { margin: '0 0 3px', color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
   meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
