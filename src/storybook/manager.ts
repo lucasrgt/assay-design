@@ -36,19 +36,22 @@ const styles = {
   atomIcon: { width: 17, height: 17, flexShrink: 0 },
   chevronIcon: { width: 14, height: 14, flexShrink: 0 },
   row: { display: 'grid', gridTemplateColumns: 'minmax(150px, .7fr) minmax(180px, 1.2fr) 90px', gap: 12, alignItems: 'center', padding: '9px 11px', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)', marginBottom: 5 },
-  inventoryRow: { display: 'grid', gridTemplateColumns: '17px minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '5px 7px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', fontWeight: 'var(--ad-tree-weight)', textAlign: 'left' as const },
+  inventoryRow: { display: 'grid', gridTemplateColumns: '17px minmax(0, 1fr) auto', gap: 8, alignItems: 'center', width: '100%', minHeight: 34, padding: '5px 7px', overflow: 'visible', borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', fontWeight: 'var(--ad-tree-weight)', textAlign: 'left' as const },
   selectedRow: { background: 'var(--ad-selected)', color: 'var(--ad-selected-text)', boxShadow: 'none', fontWeight: 'var(--ad-tree-selected-weight)' },
   inventoryName: { color: 'inherit', fontFamily: 'var(--ad-font)', fontSize: 'var(--ad-tree-size)', fontWeight: 'inherit', lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis' },
   name: { color: 'inherit', font: '600 11px var(--ad-mono)', overflow: 'hidden', textOverflow: 'ellipsis' },
   detail: { color: 'var(--ad-muted)', fontSize: 10, lineHeight: 1.4 },
-  inventoryDetail: { gridColumn: '2 / -1', color: 'inherit', opacity: .76, fontSize: 9, lineHeight: 1.35 },
   chip: { margin: '2px 3px 2px 0', fontFamily: 'var(--ad-mono)' },
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-panel)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
   workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', minHeight: 'calc(100vh - 108px)', marginRight: -20, gap: 0, alignItems: 'stretch' },
   inventory: { minWidth: 0, marginLeft: -20, padding: '8px 6px 24px', borderRight: '1px solid var(--ad-line)' },
-  inspector: { position: 'relative' as const, minWidth: 0, height: '100%', padding: 0 },
-  preview: { display: 'block', width: '100%', height: '100%', minHeight: 'calc(100vh - 108px)', border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
+  inspector: { display: 'flex', flexDirection: 'column' as const, position: 'relative' as const, minWidth: 0, height: '100%', padding: 0 },
+  componentMeta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: '5px 14px', minHeight: 45, padding: '7px 42px 7px 12px', borderBottom: '1px solid var(--ad-line)', background: 'var(--ad-canvas)' },
+  componentMetaTitle: { color: 'var(--ad-text)', fontSize: 'var(--ad-tree-size)', fontWeight: 'var(--ad-tree-selected-weight)' },
+  componentMetaGroup: { display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--ad-muted)', fontSize: 10 },
+  previewFrame: { position: 'relative' as const, display: 'flex', flex: '1 1 auto', minHeight: 0 },
+  preview: { display: 'block', flex: '1 1 auto', width: '100%', minHeight: 'calc(100vh - 154px)', border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
   previewAction: { position: 'absolute' as const, top: 8, right: 8, zIndex: 2, border: '1px solid var(--ad-line)', background: 'var(--ad-panel)' },
 };
 
@@ -139,12 +142,6 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
           element(BookmarkHollowIcon, { style: { ...styles.treeIcon, ...(selected === component.name ? {} : { color: 'var(--ad-story)' }) } }),
           element('span', { style: styles.inventoryName, title: component.name }, displayName(component.name)),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
-          selected === component.name ? element('div', { style: styles.inventoryDetail },
-            component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
-            component.variants.length ? element('div', null, 'variants ', ...chips(component.variants)) : null,
-            component.states.length ? element('div', null, 'states ', ...chips(component.states)) : null,
-            component.requiredSlots.length ? element('div', null, 'slots ', ...chips(component.requiredSlots)) : null,
-          ) : null,
         );
       }) : [element(EmptyTabContent, { key: 'empty', title: `No ${tier}s declared` })])),
     );
@@ -157,11 +154,19 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const component = payload.contract.components.find((item) => item.name === name);
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
+  const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['slots', component.requiredSlots]];
   return element('aside', { style: styles.inspector },
-    story
-      ? element('iframe', { title: `${component.name} canonical story`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false`, style: styles.preview })
-      : element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' }),
-    story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
+    element('div', { style: styles.componentMeta },
+      element('span', { style: styles.componentMetaTitle }, displayName(component.name)),
+      tierBadge(component.tier),
+      ...groups.filter(([, values]) => values.length).map(([label, values]) => element('span', { key: label, style: styles.componentMetaGroup }, label, ...chips(values))),
+    ),
+    element('div', { style: styles.previewFrame },
+      story
+        ? element('iframe', { title: `${component.name} canonical story`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false`, style: styles.preview })
+        : element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' }),
+      story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
+    ),
   );
 }
 
