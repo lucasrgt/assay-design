@@ -52,7 +52,7 @@ const styles = {
   componentMetaTitle: { color: 'var(--ad-text)', fontSize: 'var(--ad-tree-size)', fontWeight: 'var(--ad-tree-selected-weight)' },
   componentMetaDetails: { display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: '5px 14px', minHeight: 24, paddingLeft: 10, borderLeft: '1px solid var(--ad-line)' },
   componentMetaGroup: { display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ad-muted)', fontSize: 11, fontWeight: 600, lineHeight: '18px' },
-  componentMetaChip: { marginRight: 3, fontFamily: 'var(--ad-font)', fontSize: 10, fontWeight: 400, letterSpacing: 0 },
+  componentMetaChip: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, marginRight: 3, padding: '4px 7px', borderRadius: 20, fontFamily: 'var(--ad-font)', fontSize: 10, fontWeight: 600, lineHeight: '12px', letterSpacing: 0 },
   previewFrame: { position: 'relative' as const, display: 'flex', flex: '1 1 auto', minHeight: 0 },
   preview: { display: 'block', flex: '1 1 auto', width: '100%', minHeight: 'calc(100vh - 154px)', border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
   previewAction: { position: 'absolute' as const, top: 8, right: 8, zIndex: 2, border: '1px solid var(--ad-line)', background: 'var(--ad-panel)' },
@@ -98,13 +98,14 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
 
 const findingsOf = (payload: DesignPanelPayload): Finding[] => (payload.results as Result[]).flatMap((result) => result.evidence ?? []);
 const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
+const metadataColors: Record<string, string> = { parts: 'var(--ad-accent)', variants: 'var(--ad-agentic)', states: 'var(--ad-warning)', slots: 'var(--ad-story)' };
 const countObserved = (payload: DesignPanelPayload, name: string) => payload.evidence.nodes.filter((node) => node.component === name).length;
 const componentIssues = (payload: DesignPanelPayload, name: string) => {
   const indexes = new Set(payload.evidence.nodes.flatMap((node, index) => node.component === name ? [index] : []));
   return findingsOf(payload).filter((finding) => [...indexes].some((index) => finding.path === `nodes[${index}]` || finding.path.startsWith(`nodes[${index}].`)));
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
-const metadataChips = (values: readonly string[]) => values.map((value) => element('span', { key: value, style: styles.componentMetaChip }, element(Badge, { compact: true, status: 'neutral' }, displayName(value))));
+const metadataChips = (values: readonly string[], color: string) => values.map((value) => element('span', { key: value, style: { ...styles.componentMetaChip, color, background: `color-mix(in srgb, ${color} 10%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 25%, transparent)` } }, displayName(value)));
 const tierBadge = (tier: (typeof tiers)[number], compact = false) => {
   const TierIcon = tierIcons[tier];
   const iconSize = compact ? tier === 'atom' ? 12 : 11 : undefined;
@@ -164,7 +165,10 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
-      visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, displayName(label), ...metadataChips(values)))) : null,
+      visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => {
+        const color = metadataColors[label] ?? 'var(--ad-muted)';
+        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', { style: { color } }, displayName(label)), ...metadataChips(values, color));
+      })) : null,
     ),
     element('div', { style: styles.previewFrame },
       story
