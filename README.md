@@ -138,7 +138,7 @@ const verdict = await verifyEvidence(
 
 ## Storybook
 
-Add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the Design Contract panel renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
+Add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the full-page Design Contract tab renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
 
 ```ts
 export const Default = {

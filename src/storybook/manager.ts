@@ -1,9 +1,8 @@
 import React from 'react';
-import { AddonPanel } from 'storybook/internal/components';
 import { addons, types, useChannel } from 'storybook/manager-api';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
 
-const PANEL_ID = `${ADDON_ID}/panel`;
+const TAB_ID = `${ADDON_ID}/tab`;
 const element = React.createElement;
 const tiers = ['atom', 'molecule', 'organism', 'template'] as const;
 type Tab = 'inventory' | 'composition' | 'coverage' | 'violations';
@@ -12,7 +11,7 @@ type Result = { criterionId?: string; status?: string; reason?: string; evidence
 
 const color = { canvas: '#09120f', panel: '#0f1b17', line: '#20362d', text: '#e6f0eb', muted: '#7f958c', lime: '#b8f34a', red: '#fb7185', cyan: '#6ee7b7' };
 const styles = {
-  root: { minHeight: '100%', padding: 18, color: color.text, background: color.canvas, fontFamily: 'Inter, ui-sans-serif, system-ui' },
+  root: { minHeight: '100vh', width: '100%', padding: 24, color: color.text, background: color.canvas, fontFamily: 'Inter, ui-sans-serif, system-ui' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, marginBottom: 14 },
   eyebrow: { color: color.muted, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' as const },
   title: { margin: '4px 0 2px', color: color.text, fontSize: 17, fontWeight: 750 },
@@ -33,7 +32,7 @@ const styles = {
   inventory: { minWidth: 0 },
   selectable: { width: '100%', color: 'inherit', textAlign: 'left' as const, cursor: 'pointer' },
   inspector: { position: 'sticky' as const, top: 0, minWidth: 0 },
-  preview: { display: 'block', width: '100%', height: 300, border: 0, borderRadius: 7, background: '#08110f' },
+  preview: { display: 'block', width: '100%', height: 'min(680px, 66vh)', border: 0, borderRadius: 7, background: '#08110f' },
   link: { color: color.cyan, fontSize: 10, textDecoration: 'none' },
 };
 
@@ -147,13 +146,25 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   );
 }
 
-function Panel({ active }: { active: boolean }) {
-  const [payload, setPayload] = React.useState<DesignPanelPayload>();
-  const emit = useChannel({ [VERDICT_EVENT]: (next: DesignPanelPayload) => setPayload(next) });
+let cachedPayload: DesignPanelPayload | undefined;
+const subscribers = new Set<(payload: DesignPanelPayload) => void>();
+const cachePayload = (payload: DesignPanelPayload) => {
+  cachedPayload = payload;
+  for (const subscriber of subscribers) subscriber(payload);
+};
+
+function DesignPage() {
+  const [payload, setPayload] = React.useState(cachedPayload);
+  const emit = useChannel({});
   React.useEffect(() => {
-    if (active) emit(REQUEST_EVENT);
-  }, [active, emit]);
-  return element(AddonPanel, { active, children: payload ? element(Workbench, { payload }) : element('div', { style: styles.empty }, 'Render a story with parameters.designHarness to inspect its design contract.') });
+    subscribers.add(setPayload);
+    emit(REQUEST_EVENT);
+    return () => { subscribers.delete(setPayload); };
+  }, [emit]);
+  return payload ? element(Workbench, { payload }) : element('div', { style: { ...styles.root, ...styles.empty } }, 'Open a story with parameters.designHarness, then return to Design Contract.');
 }
 
-addons.register(ADDON_ID, () => addons.add(PANEL_ID, { type: types.PANEL, title: 'Design Contract', match: ({ viewMode }) => viewMode === 'story', render: ({ active }) => element(Panel, { active: Boolean(active) }) }));
+addons.register(ADDON_ID, () => {
+  addons.getChannel().on(VERDICT_EVENT, cachePayload);
+  addons.add(TAB_ID, { type: types.TAB, title: 'Design Contract', render: () => element(DesignPage) });
+});
