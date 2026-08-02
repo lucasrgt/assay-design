@@ -1,4 +1,5 @@
 import React, { type CSSProperties } from 'react';
+import { ChevronSmallDownIcon, ChevronSmallRightIcon, CircleHollowIcon, ComponentIcon, GridIcon, StructureIcon } from '@storybook/icons';
 import { Badge, Button, EmptyTabContent, Link, TabButton } from 'storybook/internal/components';
 import { addons, types, useChannel } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
@@ -7,24 +8,30 @@ import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from 
 const TAB_ID = `${ADDON_ID}/tab`;
 const element = React.createElement;
 const tiers = ['atom', 'molecule', 'organism', 'template'] as const;
+const tierIcons = { atom: CircleHollowIcon, molecule: ComponentIcon, organism: GridIcon, template: StructureIcon };
+const tierColors = { atom: 'var(--ad-accent)', molecule: 'var(--ad-accent)', organism: 'var(--ad-positive)', template: 'var(--ad-warning)' };
 type Tab = 'inventory' | 'composition' | 'coverage' | 'violations';
 type Finding = { rule: string; category: string; path: string; message: string };
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
 
 const styles = {
-  root: { minHeight: '100vh', width: '100%', padding: '40px 20px 24px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
+  root: { minHeight: '100vh', width: '100%', padding: '32px 20px 24px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, marginBottom: 14 },
   title: { margin: '0 0 3px', color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
   meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
   tabs: { display: 'flex', gap: 2, marginBottom: 14, borderBottom: '1px solid var(--ad-line)' },
-  section: { marginBottom: 13 },
+  section: { marginBottom: 6 },
   sectionTitle: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, color: 'var(--ad-muted)', fontSize: 10, fontWeight: 600 },
+  treeGroup: { display: 'grid', gridTemplateColumns: '12px 14px minmax(0, 1fr) auto', justifyContent: 'stretch', gap: 6, width: '100%', padding: '0 6px', color: 'var(--ad-text)', textAlign: 'left' as const },
+  treeGroupLabel: { overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12, fontWeight: 600 },
+  treeChildren: { marginLeft: 11, paddingLeft: 10, borderLeft: '1px solid var(--ad-line)' },
+  treeIcon: { width: 12, height: 12 },
   row: { display: 'grid', gridTemplateColumns: 'minmax(150px, .7fr) minmax(180px, 1.2fr) 90px', gap: 12, alignItems: 'center', padding: '9px 11px', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)', marginBottom: 5 },
-  inventoryRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '6px 8px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
+  inventoryRow: { display: 'grid', gridTemplateColumns: '14px minmax(0, 1fr) auto', gap: '5px 7px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 32, padding: '5px 7px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
   selectedRow: { background: 'var(--ad-hover)', boxShadow: 'inset 2px 0 var(--ad-accent)' },
   name: { color: 'var(--ad-text)', font: '600 11px var(--ad-mono)', overflow: 'hidden', textOverflow: 'ellipsis' },
   detail: { color: 'var(--ad-muted)', fontSize: 10, lineHeight: 1.4 },
-  inventoryDetail: { gridColumn: '1 / -1', color: 'var(--ad-muted)', fontSize: 9, lineHeight: 1.35 },
+  inventoryDetail: { gridColumn: '2 / -1', color: 'var(--ad-muted)', fontSize: 9, lineHeight: 1.35 },
   chip: { margin: '2px 3px 2px 0', fontFamily: 'var(--ad-mono)' },
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', gap: 16, alignItems: 'start' },
@@ -43,6 +50,7 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
   '--ad-muted': theme.fgColor.muted,
   '--ad-accent': theme.fgColor.accent,
   '--ad-positive': theme.fgColor.positive,
+  '--ad-warning': theme.fgColor.warning,
   '--ad-negative': theme.fgColor.negative,
   '--ad-font': theme.typography.fonts.base,
   '--ad-mono': theme.typography.fonts.mono,
@@ -58,16 +66,29 @@ const componentIssues = (payload: DesignPanelPayload, name: string) => {
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
 
 function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayload; selected: string; onSelect(name: string): void }) {
+  const [collapsed, setCollapsed] = React.useState<Record<(typeof tiers)[number], boolean>>({ atom: false, molecule: false, organism: false, template: false });
   return element(React.Fragment, null, ...tiers.map((tier) => {
     const components = payload.contract.components.filter((component) => component.tier === tier);
+    const TierIcon = tierIcons[tier];
+    const isCollapsed = collapsed[tier];
     return element('section', { key: tier, style: styles.section },
-      element('div', { style: styles.sectionTitle }, element('span', null, `${tier}s`), element(Badge, { compact: true, status: 'neutral' }, components.length)),
-      ...(components.length ? components.map((component) => {
+      element(Button, {
+        variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, 'aria-expanded': !isCollapsed,
+        onClick: () => setCollapsed((current) => ({ ...current, [tier]: !current[tier] })), style: styles.treeGroup,
+        children: [
+          element(isCollapsed ? ChevronSmallRightIcon : ChevronSmallDownIcon, { key: 'chevron', style: { ...styles.treeIcon, color: 'var(--ad-muted)' } }),
+          element(TierIcon, { key: 'tier', style: { ...styles.treeIcon, color: tierColors[tier] } }),
+          element('span', { key: 'label', style: styles.treeGroupLabel }, `${tier.charAt(0).toUpperCase()}${tier.slice(1)}s`),
+          element(Badge, { key: 'count', compact: true, status: 'neutral' }, components.length),
+        ],
+      }),
+      isCollapsed ? null : element('div', { style: styles.treeChildren }, ...(components.length ? components.map((component) => {
         const observed = countObserved(payload, component.name);
         const issues = componentIssues(payload, component.name).length;
         const status = issues ? `${issues} issue${issues === 1 ? '' : 's'}` : observed ? `${observed} observed` : 'not observed';
         const story = payload.stories[component.name];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
+          element(TierIcon, { style: { ...styles.treeIcon, color: tierColors[tier] } }),
           element('span', { style: styles.name }, component.name),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
           selected === component.name ? element('div', { style: styles.inventoryDetail },
@@ -77,7 +98,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
             component.requiredSlots.length ? element('div', null, 'slots ', ...chips(component.requiredSlots)) : null,
           ) : null,
         );
-      }) : [element(EmptyTabContent, { key: 'empty', title: `No ${tier}s declared` })]),
+      }) : [element(EmptyTabContent, { key: 'empty', title: `No ${tier}s declared` })])),
     );
   }));
 }

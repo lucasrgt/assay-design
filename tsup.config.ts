@@ -13,6 +13,7 @@ export default defineConfig([
     format: ['esm'],
     dts: true,
     splitting: true,
+    noExternal: ['@storybook/icons'],
     clean: true,
     sourcemap: true,
   },
