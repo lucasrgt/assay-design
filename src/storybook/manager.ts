@@ -26,7 +26,7 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, marginBottom: 14 },
   title: { margin: '0 0 3px', color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
   meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
-  tabs: { display: 'flex', gap: 2, margin: '0 -20px', padding: '0 20px', borderBottom: '1px solid var(--ad-line)' },
+  tabs: { display: 'flex', gap: 0, margin: '0 -20px', padding: 0, borderBottom: '1px solid var(--ad-line)' },
   section: { marginBottom: 6 },
   sectionTitle: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, color: 'var(--ad-muted)', fontSize: 10, fontWeight: 600 },
   treeGroup: { display: 'grid', gridTemplateColumns: '14px 17px minmax(0, 1fr) auto', justifyContent: 'stretch', gap: 7, width: '100%', padding: '0 6px', color: 'var(--ad-text)', textAlign: 'left' as const },
