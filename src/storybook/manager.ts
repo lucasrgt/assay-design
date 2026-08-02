@@ -35,8 +35,9 @@ const styles = {
   atomIcon: { width: 17, height: 17, flexShrink: 0 },
   chevronIcon: { width: 14, height: 14, flexShrink: 0 },
   row: { display: 'grid', gridTemplateColumns: 'minmax(150px, .7fr) minmax(180px, 1.2fr) 90px', gap: 12, alignItems: 'center', padding: '9px 11px', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)', marginBottom: 5 },
-  inventoryRow: { display: 'grid', gridTemplateColumns: '17px minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '5px 7px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
-  selectedRow: { background: 'var(--ad-selected)', color: 'var(--ad-selected-text)', boxShadow: 'none', fontWeight: 700 },
+  inventoryRow: { display: 'grid', gridTemplateColumns: '17px minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '5px 7px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', fontWeight: 'var(--ad-tree-weight)', textAlign: 'left' as const },
+  selectedRow: { background: 'var(--ad-selected)', color: 'var(--ad-selected-text)', boxShadow: 'none', fontWeight: 'var(--ad-tree-selected-weight)' },
+  inventoryName: { color: 'inherit', fontFamily: 'var(--ad-font)', fontSize: 'var(--ad-tree-size)', fontWeight: 'inherit', lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis' },
   name: { color: 'inherit', font: '600 11px var(--ad-mono)', overflow: 'hidden', textOverflow: 'ellipsis' },
   detail: { color: 'var(--ad-muted)', fontSize: 10, lineHeight: 1.4 },
   inventoryDetail: { gridColumn: '2 / -1', color: 'inherit', opacity: .76, fontSize: 9, lineHeight: 1.35 },
@@ -82,6 +83,7 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
   '--ad-mono': theme.typography.fonts.mono,
   '--ad-tree-size': `${theme.typography.size.s2}px`,
   '--ad-tree-weight': `${theme.typography.weight.regular}`,
+  '--ad-tree-selected-weight': `${theme.typography.weight.bold}`,
   '--ad-radius': `${theme.appBorderRadius}px`,
 });
 
@@ -117,7 +119,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         const story = payload.stories[component.name];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
           element(BookmarkHollowIcon, { style: { ...styles.treeIcon, ...(selected === component.name ? {} : { color: 'var(--ad-story)' }) } }),
-          element('span', { style: styles.name }, component.name),
+          element('span', { style: styles.inventoryName }, component.name),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
           selected === component.name ? element('div', { style: styles.inventoryDetail },
             component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
@@ -200,7 +202,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const findings = findingsOf(payload);
   const observed = new Set(payload.evidence.nodes.map((node) => node.component)).size;
   const tabs: [Tab, string, number][] = [
-    ['inventory', 'Inventory', payload.contract.components.length],
+    ['inventory', 'Atomic View', payload.contract.components.length],
     ['composition', 'Composition', payload.contract.components.reduce((sum, item) => sum + item.parts.length, 0)],
     ['coverage', 'Coverage', payload.contract.surfaces.length],
     ['violations', 'Violations', findings.length],
