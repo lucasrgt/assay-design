@@ -46,7 +46,7 @@ const styles = {
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-panel)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
   workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', gap: 16, alignItems: 'stretch' },
-  inventory: { minWidth: 0, marginLeft: -20, padding: '8px 12px 24px 4px', borderRight: '1px solid var(--ad-line)' },
+  inventory: { minWidth: 0, marginLeft: -20, padding: '8px 6px 24px', borderRight: '1px solid var(--ad-line)' },
   inspector: { position: 'sticky' as const, top: 0, minWidth: 0, padding: '14px 0 24px' },
   preview: { display: 'block', width: '100%', height: 'min(720px, 72vh)', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
 };
