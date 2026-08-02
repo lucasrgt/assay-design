@@ -1,6 +1,6 @@
 import React, { type CSSProperties } from 'react';
-import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, GridIcon, StructureIcon } from '@storybook/icons';
-import { Badge, Button, EmptyTabContent, Link, TabButton } from 'storybook/internal/components';
+import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, ExpandAltIcon, GridIcon, StructureIcon } from '@storybook/icons';
+import { Badge, Button, EmptyTabContent, IconButton, TabButton } from 'storybook/internal/components';
 import { addons, types, useAddonState, useChannel, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
@@ -23,8 +23,8 @@ type Result = { criterionId?: string; status?: string; reason?: string; evidence
 
 const styles = {
   root: { display: 'flex', flexDirection: 'column' as const, minHeight: '100vh', width: '100%', boxSizing: 'border-box' as const, padding: '32px 20px 0', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, marginBottom: 14 },
-  title: { margin: '0 0 3px', color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
+  header: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 },
+  title: { margin: 0, color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
   meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
   tabs: { display: 'flex', gap: 0, margin: '0 -20px', padding: 0, borderBottom: '1px solid var(--ad-line)' },
   section: { marginBottom: 6 },
@@ -45,10 +45,11 @@ const styles = {
   chip: { margin: '2px 3px 2px 0', fontFamily: 'var(--ad-mono)' },
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-panel)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
-  workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', gap: 16, alignItems: 'stretch' },
+  workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', minHeight: 'calc(100vh - 108px)', marginRight: -20, gap: 0, alignItems: 'stretch' },
   inventory: { minWidth: 0, marginLeft: -20, padding: '8px 6px 24px', borderRight: '1px solid var(--ad-line)' },
-  inspector: { position: 'sticky' as const, top: 0, minWidth: 0, padding: '14px 0 24px' },
-  preview: { display: 'block', width: '100%', height: 'min(720px, 72vh)', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
+  inspector: { position: 'relative' as const, minWidth: 0, height: '100%', padding: 0 },
+  preview: { display: 'block', width: '100%', height: '100%', minHeight: 'calc(100vh - 108px)', border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
+  previewAction: { position: 'absolute' as const, top: 8, right: 8, zIndex: 2, border: '1px solid var(--ad-line)', background: 'var(--ad-panel)' },
 };
 
 type ThemeVariables = CSSProperties & Record<`--ad-${string}`, string>;
@@ -152,7 +153,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
 }
 
 function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name: string }) {
-  if (name === COMPOSITION_VIEW) return element('aside', { style: styles.inspector }, element(Composition, { payload }));
+  if (name === COMPOSITION_VIEW) return element('aside', { style: { ...styles.inspector, padding: 14 } }, element(Composition, { payload }));
   const component = payload.contract.components.find((item) => item.name === name);
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
@@ -160,7 +161,7 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
     story
       ? element('iframe', { title: `${component.name} canonical story`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false`, style: styles.preview })
       : element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' }),
-    story ? element('div', { style: { marginTop: 8, textAlign: 'right' } }, element(Link, { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', withArrow: true }, 'Open in canvas')) : null,
+    story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
   );
 }
 
