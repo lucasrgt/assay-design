@@ -1,4 +1,5 @@
 import { definePreviewAddon } from 'storybook/internal/csf';
+import { addons } from 'storybook/preview-api';
 import { collectDocument, verifyEvidence, type DesignContract } from '../index.js';
 
 export const ADDON_ID = 'assay-design';
@@ -41,9 +42,9 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
 
 export default definePreviewAddon({
   decorators: [
-    (Story, context) => {
+    (Story, context, channel: Channel = addons.getChannel()) => {
       const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2] } | undefined;
-      if (settings?.contract && settings.surface) publishStoryPanel(context.channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage));
+      if (settings?.contract && settings.surface) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage));
       return Story();
     },
   ],

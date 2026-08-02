@@ -1,6 +1,6 @@
 import React from 'react';
 import { AddonPanel } from 'storybook/internal/components';
-import { addons, types } from 'storybook/manager-api';
+import { addons, types, useChannel } from 'storybook/manager-api';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
 
 const PANEL_ID = `${ADDON_ID}/panel`;
@@ -124,12 +124,10 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
 
 function Panel({ active }: { active: boolean }) {
   const [payload, setPayload] = React.useState<DesignPanelPayload>();
+  const emit = useChannel({ [VERDICT_EVENT]: (next: DesignPanelPayload) => setPayload(next) });
   React.useEffect(() => {
-    const channel = addons.getChannel();
-    channel.on(VERDICT_EVENT, setPayload);
-    if (active) channel.emit(REQUEST_EVENT);
-    return () => channel.off(VERDICT_EVENT, setPayload);
-  }, [active]);
+    if (active) emit(REQUEST_EVENT);
+  }, [active, emit]);
   return element(AddonPanel, { active, children: payload ? element(Workbench, { payload }) : element('div', { style: styles.empty }, 'Render a story with parameters.designHarness to inspect its design contract.') });
 }
 

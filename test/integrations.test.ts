@@ -58,8 +58,8 @@ describe('Storybook', () => {
     const channel = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
     const Story = vi.fn(() => 'story');
     const decorator = (storybook as any).decorators[0];
-    expect(decorator(Story, { parameters: {}, channel })).toBe('story');
-    decorator(Story, { parameters: { designHarness: { contract: contract(), surface: 'dashboard', coverage: { states: [] } } }, channel });
+    expect(decorator(Story, { parameters: {}, channel }, channel)).toBe('story');
+    decorator(Story, { parameters: { designHarness: { contract: contract(), surface: 'dashboard', coverage: { states: [] } } }, channel }, channel);
     await vi.runAllTimersAsync();
     expect(channel.emit).toHaveBeenCalledWith('assay-design/verdict', expect.objectContaining({ outcome: 'fail' }));
     vi.useRealTimers();
