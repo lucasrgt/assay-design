@@ -29,7 +29,7 @@ const styles = {
   section: { marginBottom: 6 },
   sectionTitle: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, color: 'var(--ad-muted)', fontSize: 10, fontWeight: 600 },
   treeGroup: { display: 'grid', gridTemplateColumns: '14px 17px minmax(0, 1fr) auto', justifyContent: 'stretch', gap: 7, width: '100%', padding: '0 6px', color: 'var(--ad-text)', textAlign: 'left' as const },
-  treeGroupLabel: { overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12, fontWeight: 600 },
+  treeGroupLabel: { overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 'var(--ad-tree-size)', fontWeight: 'var(--ad-tree-weight)' },
   treeChildren: { marginLeft: 11, paddingLeft: 10, borderLeft: '1px solid var(--ad-line)' },
   treeIcon: { width: 14, height: 14, flexShrink: 0 },
   atomIcon: { width: 17, height: 17, flexShrink: 0 },
@@ -64,6 +64,8 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
   '--ad-negative': theme.fgColor.negative,
   '--ad-font': theme.typography.fonts.base,
   '--ad-mono': theme.typography.fonts.mono,
+  '--ad-tree-size': `${theme.typography.size.s2}px`,
+  '--ad-tree-weight': `${theme.typography.weight.regular}`,
   '--ad-radius': `${theme.appBorderRadius}px`,
 });
 
