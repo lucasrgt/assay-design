@@ -22,8 +22,8 @@ type Finding = { rule: string; category: string; path: string; message: string }
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
 
 const styles = {
-  root: { display: 'flex', flexDirection: 'column' as const, minHeight: '100vh', width: '100%', boxSizing: 'border-box' as const, padding: '32px 20px 0', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
-  header: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 },
+  root: { display: 'flex', flexDirection: 'column' as const, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box' as const, padding: '32px 20px 0', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
+  header: { display: 'flex', alignItems: 'center', gap: 8, margin: '0 -20px', padding: '0 20px 14px', borderBottom: '1px solid var(--ad-line)' },
   title: { margin: 0, color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
   meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
   tabs: { display: 'flex', gap: 0, margin: '0 -20px', padding: 0, borderBottom: '1px solid var(--ad-line)' },
@@ -44,8 +44,8 @@ const styles = {
   chip: { margin: '2px 3px 2px 0', fontFamily: 'var(--ad-mono)' },
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-panel)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
-  workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', minHeight: 'calc(100vh - 108px)', marginRight: -20, gap: 0, alignItems: 'stretch' },
-  inventory: { minWidth: 0, marginLeft: -20, padding: '8px 6px 24px', borderRight: '1px solid var(--ad-line)' },
+  workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', minHeight: 0, marginRight: -20, gap: 0, alignItems: 'stretch' },
+  inventory: { minWidth: 0, minHeight: 0, overflowY: 'auto' as const, marginLeft: -20, padding: '8px 6px 24px', borderRight: '1px solid var(--ad-line)' },
   inspector: { display: 'flex', flexDirection: 'column' as const, position: 'relative' as const, minWidth: 0, height: '100%', padding: 0 },
   componentMeta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: 10, minHeight: 45, padding: '7px 42px 7px 12px', borderBottom: '1px solid var(--ad-line)', background: 'var(--ad-canvas)' },
   componentIdentity: { display: 'inline-flex', alignItems: 'center', gap: 5 },
@@ -271,7 +271,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   ];
   const content = tab === 'inventory'
     ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected, storyId, onSelectStory: (id) => api.selectStory(id) }))
-    : element('div', { style: { padding: '14px 0 24px' } }, tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload }));
+    : element('div', { style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '14px 0 24px' } }, tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload }));
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('header', { style: styles.header },
       element('div', { style: styles.title }, payload.contract.name),
