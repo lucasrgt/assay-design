@@ -8,7 +8,7 @@ import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from 
 const TAB_ID = `${ADDON_ID}/tab`;
 const element = React.createElement;
 const tiers = ['atom', 'molecule', 'organism', 'template'] as const;
-const AtomIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => element('svg', { ...props, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+const AtomIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => element('svg', { ...props, viewBox: '1 1 22 22', fill: 'none', 'aria-hidden': true },
   element('ellipse', { cx: 12, cy: 12, rx: 9, ry: 3.7, stroke: 'currentColor', strokeWidth: 1.7 }),
   element('ellipse', { cx: 12, cy: 12, rx: 9, ry: 3.7, stroke: 'currentColor', strokeWidth: 1.7, transform: 'rotate(60 12 12)' }),
   element('ellipse', { cx: 12, cy: 12, rx: 9, ry: 3.7, stroke: 'currentColor', strokeWidth: 1.7, transform: 'rotate(120 12 12)' }),
@@ -28,13 +28,14 @@ const styles = {
   tabs: { display: 'flex', gap: 2, marginBottom: 14, borderBottom: '1px solid var(--ad-line)' },
   section: { marginBottom: 6 },
   sectionTitle: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, color: 'var(--ad-muted)', fontSize: 10, fontWeight: 600 },
-  treeGroup: { display: 'grid', gridTemplateColumns: '14px 16px minmax(0, 1fr) auto', justifyContent: 'stretch', gap: 7, width: '100%', padding: '0 6px', color: 'var(--ad-text)', textAlign: 'left' as const },
+  treeGroup: { display: 'grid', gridTemplateColumns: '14px 17px minmax(0, 1fr) auto', justifyContent: 'stretch', gap: 7, width: '100%', padding: '0 6px', color: 'var(--ad-text)', textAlign: 'left' as const },
   treeGroupLabel: { overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12, fontWeight: 600 },
   treeChildren: { marginLeft: 11, paddingLeft: 10, borderLeft: '1px solid var(--ad-line)' },
-  treeIcon: { width: 16, height: 16, flexShrink: 0 },
+  treeIcon: { width: 14, height: 14, flexShrink: 0 },
+  atomIcon: { width: 17, height: 17, flexShrink: 0 },
   chevronIcon: { width: 14, height: 14, flexShrink: 0 },
   row: { display: 'grid', gridTemplateColumns: 'minmax(150px, .7fr) minmax(180px, 1.2fr) 90px', gap: 12, alignItems: 'center', padding: '9px 11px', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)', marginBottom: 5 },
-  inventoryRow: { display: 'grid', gridTemplateColumns: '16px minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '5px 7px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
+  inventoryRow: { display: 'grid', gridTemplateColumns: '17px minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '5px 7px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
   selectedRow: { background: 'var(--ad-hover)', boxShadow: 'inset 2px 0 var(--ad-accent)' },
   name: { color: 'var(--ad-text)', font: '600 11px var(--ad-mono)', overflow: 'hidden', textOverflow: 'ellipsis' },
   detail: { color: 'var(--ad-muted)', fontSize: 10, lineHeight: 1.4 },
@@ -85,7 +86,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         onClick: () => setCollapsed((current) => ({ ...current, [tier]: !current[tier] })), style: styles.treeGroup,
         children: [
           element(isCollapsed ? ChevronSmallRightIcon : ChevronSmallDownIcon, { key: 'chevron', style: { ...styles.chevronIcon, color: 'var(--ad-muted)' } }),
-          element(TierIcon, { key: 'tier', style: { ...styles.treeIcon, color: tierColors[tier] } }),
+          element(TierIcon, { key: 'tier', style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), color: tierColors[tier] } }),
           element('span', { key: 'label', style: styles.treeGroupLabel }, `${tier.charAt(0).toUpperCase()}${tier.slice(1)}s`),
           element(Badge, { key: 'count', compact: true, status: 'neutral' }, components.length),
         ],
@@ -96,7 +97,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         const status = issues ? `${issues} issue${issues === 1 ? '' : 's'}` : observed ? `${observed} observed` : 'not observed';
         const story = payload.stories[component.name];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
-          element(TierIcon, { style: { ...styles.treeIcon, color: tierColors[tier] } }),
+          element(TierIcon, { style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), color: tierColors[tier] } }),
           element('span', { style: styles.name }, component.name),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
           selected === component.name ? element('div', { style: styles.inventoryDetail },
