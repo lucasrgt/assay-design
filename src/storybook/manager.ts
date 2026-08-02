@@ -88,6 +88,7 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
 });
 
 const findingsOf = (payload: DesignPanelPayload): Finding[] => (payload.results as Result[]).flatMap((result) => result.evidence ?? []);
+const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
 const countObserved = (payload: DesignPanelPayload, name: string) => payload.evidence.nodes.filter((node) => node.component === name).length;
 const componentIssues = (payload: DesignPanelPayload, name: string) => {
   const indexes = new Set(payload.evidence.nodes.flatMap((node, index) => node.component === name ? [index] : []));
@@ -119,7 +120,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         const story = payload.stories[component.name];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
           element(BookmarkHollowIcon, { style: { ...styles.treeIcon, ...(selected === component.name ? {} : { color: 'var(--ad-story)' }) } }),
-          element('span', { style: styles.inventoryName }, component.name),
+          element('span', { style: styles.inventoryName, title: component.name }, displayName(component.name)),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
           selected === component.name ? element('div', { style: styles.inventoryDetail },
             component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
