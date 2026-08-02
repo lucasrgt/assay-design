@@ -63,13 +63,17 @@
   },
   "peerDependencies": {
     "react": ">=18",
-    "storybook": "^10.0.0"
+    "storybook": "^10.0.0",
+    "storybook-addon-pseudo-states": "^10.5.5"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
     "storybook": {
+      "optional": true
+    },
+    "storybook-addon-pseudo-states": {
       "optional": true
     }
   },
@@ -90,6 +94,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.2.8",
     "storybook": "^10.5.5",
+    "storybook-addon-pseudo-states": "^10.5.5",
     "tsup": "^8.5.1",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.48.0",

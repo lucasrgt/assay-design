@@ -99,17 +99,19 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
 const findingsOf = (payload: DesignPanelPayload): Finding[] => (payload.results as Result[]).flatMap((result) => result.evidence ?? []);
 const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
 const metadataColors: Record<string, string> = { parts: 'var(--ad-accent)', variants: 'var(--ad-agentic)', states: 'var(--ad-warning)', slots: 'var(--ad-story)' };
+const pseudoStateKeys: Record<string, string> = { hover: 'hover', active: 'active', pressed: 'active', click: 'active', focus: 'focus', 'focus-visible': 'focusVisible', 'focus-within': 'focusWithin' };
 const countObserved = (payload: DesignPanelPayload, name: string) => payload.evidence.nodes.filter((node) => node.component === name).length;
 const componentIssues = (payload: DesignPanelPayload, name: string) => {
   const indexes = new Set(payload.evidence.nodes.flatMap((node, index) => node.component === name ? [index] : []));
   return findingsOf(payload).filter((finding) => [...indexes].some((index) => finding.path === `nodes[${index}]` || finding.path.startsWith(`nodes[${index}].`)));
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
-const metadataChips = (values: readonly string[], color: string, selected?: string, onSelect?: (value: string) => void) => values.map((value) => {
+const metadataChips = (values: readonly string[], color: string, selected?: string, onSelect?: (value: string) => void, canSelect: (value: string) => boolean = () => true) => values.map((value) => {
   const active = selected === value;
-  const style = { ...styles.componentMetaChip, color, background: `color-mix(in srgb, ${color} ${active ? 24 : 10}%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} ${active ? 55 : 25}%, transparent)`, ...(onSelect ? { border: 0, cursor: 'pointer' } : {}) };
-  return onSelect
-    ? element('button', { key: value, type: 'button', style, 'aria-pressed': active, onClick: () => onSelect(value) }, displayName(value))
+  const interactive = Boolean(onSelect && canSelect(value));
+  const style = { ...styles.componentMetaChip, color, background: `color-mix(in srgb, ${color} ${active ? 24 : 10}%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} ${active ? 55 : 25}%, transparent)`, ...(interactive ? { border: 0, cursor: 'pointer' } : {}) };
+  return interactive
+    ? element('button', { key: value, type: 'button', style, 'aria-pressed': active, onClick: () => onSelect?.(value) }, displayName(value))
     : element('span', { key: value, style }, displayName(value));
 });
 const argsQuery = (args: Record<string, string | number | boolean | null>) => Object.entries(args).map(([key, value]) => `${key}:${String(value)}`).join(';');
@@ -175,22 +177,26 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const choose = (group: string, value: string) => setSelections((current) => ({ ...current, [name]: { ...current[name], [group]: value } }));
   const args = Object.assign({}, ...(['variants', 'states'] as const).map((group) => controls[group]?.[componentSelections[group] ?? component[group][0] ?? ''] ?? {}));
   const query = argsQuery(args);
-  const source = story ? `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false${query ? `&args=${encodeURIComponent(query)}` : ''}` : '';
+  const pseudoState = pseudoStateKeys[componentSelections.states ?? component.states[0] ?? ''];
+  const globals = pseudoState ? `pseudo.${pseudoState}:!true` : '';
+  const source = story ? `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false${query ? `&args=${encodeURIComponent(query)}` : ''}${globals ? `&globals=${encodeURIComponent(globals)}` : ''}` : '';
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
       visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => {
         const color = metadataColors[label] ?? 'var(--ad-muted)';
         const control = label === 'variants' || label === 'states' ? controls[label] : undefined;
-        const selected = control ? componentSelections[label] ?? values[0] : undefined;
-        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color, selected, control ? (value) => choose(label, value) : undefined));
+        const canSelect = (value: string) => Boolean(control?.[value] || label === 'states' && pseudoStateKeys[value]);
+        const interactive = values.some(canSelect);
+        const selected = interactive ? componentSelections[label] ?? values[0] : undefined;
+        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color, selected, interactive ? (value) => choose(label, value) : undefined, canSelect));
       })) : null,
     ),
     element('div', { style: styles.previewFrame },
       story
         ? element('iframe', { title: `${component.name} canonical story`, src: source, style: styles.preview })
         : element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' }),
-      story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}${query ? `&args=${encodeURIComponent(query)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
+      story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(story)}${query ? `&args=${encodeURIComponent(query)}` : ''}${globals ? `&globals=${encodeURIComponent(globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
   );
 }

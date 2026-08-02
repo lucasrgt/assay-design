@@ -34,7 +34,7 @@ max_heading_jump = 1
 name = "button"
 tier = "atom"
 variants = ["primary", "secondary"]
-states = ["default", "disabled"]
+states = ["default", "hover", "active", "focus", "focus-visible", "disabled"]
 roles = ["button"]
 required_slots = ["label"]
 

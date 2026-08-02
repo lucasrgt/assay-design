@@ -138,7 +138,7 @@ const verdict = await verifyEvidence(
 
 ## Storybook
 
-Add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the full-page Design Contract tab renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
+Install the optional `storybook-addon-pseudo-states` peer and add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the full-page Design Contract tab renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
 
 ```ts
 export const Default = {
@@ -162,7 +162,7 @@ export const Default = {
 };
 ```
 
-The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. Explicit `controls` bind contract variants and states to real Storybook args; those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
+The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. Explicit `controls` bind contract variants and data states to real Storybook args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
 
 The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
 

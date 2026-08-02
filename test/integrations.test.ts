@@ -50,6 +50,7 @@ describe('Storybook', () => {
     expect((await evaluateStoryPanel(contract(), 'dashboard')).contract.components.some((item) => item.name === 'card')).toBe(true);
     expect(managerEntries(['base'])[0]).toBe('base');
     expect(managerEntries().at(-1)).toMatch(/manager\.js$/);
+    expect(previewAnnotations()).toEqual(expect.arrayContaining([expect.stringMatching(/storybook-addon-pseudo-states.*preview/)]));
     expect(previewAnnotations().at(-1)).toMatch(/preview\.js$/);
   });
 
