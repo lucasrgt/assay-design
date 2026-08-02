@@ -44,7 +44,7 @@ const styles = {
   inventoryDetail: { gridColumn: '2 / -1', color: 'inherit', opacity: .76, fontSize: 9, lineHeight: 1.35 },
   chip: { margin: '2px 3px 2px 0', fontFamily: 'var(--ad-mono)' },
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
-  tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-hover)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
+  tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-panel)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
   workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', gap: 16, alignItems: 'start' },
   inventory: { minWidth: 0, paddingRight: 12, borderRight: '1px solid var(--ad-line)' },
   inspector: { position: 'sticky' as const, top: 0, minWidth: 0 },
