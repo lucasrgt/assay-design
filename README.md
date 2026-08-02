@@ -148,6 +148,12 @@ export const Default = {
 
 The addon is optional: Assay Design does not install or replace Storybook.
 
+The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
+
+```sh
+npm run storybook
+```
+
 ## Figma
 
 Build the package, then import [`figma/manifest.json`](./figma/manifest.json) as a development plugin. Paste the output of `assay-design export`; the plugin scans local components and variables, emits lint evidence, and asks the same AVP core for a verdict. It never writes over the Git contract.
