@@ -47,8 +47,10 @@ const styles = {
   workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', flex: '1 1 auto', minHeight: 'calc(100vh - 108px)', marginRight: -20, gap: 0, alignItems: 'stretch' },
   inventory: { minWidth: 0, marginLeft: -20, padding: '8px 6px 24px', borderRight: '1px solid var(--ad-line)' },
   inspector: { display: 'flex', flexDirection: 'column' as const, position: 'relative' as const, minWidth: 0, height: '100%', padding: 0 },
-  componentMeta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: '5px 14px', minHeight: 45, padding: '7px 42px 7px 12px', borderBottom: '1px solid var(--ad-line)', background: 'var(--ad-canvas)' },
+  componentMeta: { display: 'flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: 10, minHeight: 45, padding: '7px 42px 7px 12px', borderBottom: '1px solid var(--ad-line)', background: 'var(--ad-canvas)' },
+  componentIdentity: { display: 'inline-flex', alignItems: 'center', gap: 5 },
   componentMetaTitle: { color: 'var(--ad-text)', fontSize: 'var(--ad-tree-size)', fontWeight: 'var(--ad-tree-selected-weight)' },
+  componentMetaDetails: { display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: '5px 14px', minHeight: 24, paddingLeft: 10, borderLeft: '1px solid var(--ad-line)' },
   componentMetaGroup: { display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--ad-muted)', fontSize: 10 },
   previewFrame: { position: 'relative' as const, display: 'flex', flex: '1 1 auto', minHeight: 0 },
   preview: { display: 'block', flex: '1 1 auto', width: '100%', minHeight: 'calc(100vh - 154px)', border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
@@ -101,10 +103,11 @@ const componentIssues = (payload: DesignPanelPayload, name: string) => {
   return findingsOf(payload).filter((finding) => [...indexes].some((index) => finding.path === `nodes[${index}]` || finding.path.startsWith(`nodes[${index}].`)));
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
-const tierBadge = (tier: (typeof tiers)[number]) => {
+const tierBadge = (tier: (typeof tiers)[number], compact = false) => {
   const TierIcon = tierIcons[tier];
-  return element('span', { style: styles.tierBadge },
-    element(TierIcon, { style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), color: tierColors[tier] } }),
+  const iconSize = compact ? tier === 'atom' ? 12 : 11 : undefined;
+  return element('span', { style: { ...styles.tierBadge, ...(compact ? { gap: 3, padding: '2px 6px', fontSize: 9 } : {}) } },
+    element(TierIcon, { style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), ...(iconSize ? { width: iconSize, height: iconSize } : {}), color: tierColors[tier] } }),
     element('span', null, tier),
   );
 };
@@ -155,11 +158,11 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
   const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['slots', component.requiredSlots]];
+  const visibleGroups = groups.filter(([, values]) => values.length);
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
-      tierBadge(component.tier),
-      element('span', { style: styles.componentMetaTitle }, displayName(component.name)),
-      ...groups.filter(([, values]) => values.length).map(([label, values]) => element('span', { key: label, style: styles.componentMetaGroup }, label, ...chips(values))),
+      element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
+      visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values]) => element('span', { key: label, style: styles.componentMetaGroup }, label, ...chips(values)))) : null,
     ),
     element('div', { style: styles.previewFrame },
       story
