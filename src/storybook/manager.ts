@@ -58,6 +58,7 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
   '--ad-muted': theme.fgColor.muted,
   '--ad-accent': theme.fgColor.accent,
   '--ad-agentic': theme.fgColor.agentic,
+  '--ad-story': theme.color.seafoam,
   '--ad-positive': theme.fgColor.positive,
   '--ad-warning': theme.fgColor.warning,
   '--ad-negative': theme.fgColor.negative,
@@ -97,7 +98,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         const status = issues ? `${issues} issue${issues === 1 ? '' : 's'}` : observed ? `${observed} observed` : 'not observed';
         const story = payload.stories[component.name];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
-          element(BookmarkHollowIcon, { style: { ...styles.treeIcon, color: 'var(--ad-accent)' } }),
+          element(BookmarkHollowIcon, { style: { ...styles.treeIcon, color: 'var(--ad-story)' } }),
           element('span', { style: styles.name }, component.name),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
           selected === component.name ? element('div', { style: styles.inventoryDetail },
