@@ -13,7 +13,7 @@ The three design surfaces have deliberately different jobs:
 ## Start
 
 ```sh
-npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.4.0/assay-design-0.4.0.tgz
+npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.4.2/assay-design-0.4.2.tgz
 npx assay-design init
 npx assay-design doctor
 npx assay-design context
@@ -152,6 +152,12 @@ const verdict = await verifyEvidence(
 ## Storybook
 
 Install the optional `storybook-addon-pseudo-states` peer and add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the full-page Design Contract tab renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
+
+Compile or import contracts inside Storybook preview code through `assay-design/browser`. The main entrypoint also exposes filesystem-backed CLI helpers and is intentionally Node-only.
+
+```ts
+import { parseContract } from 'assay-design/browser';
+```
 
 ```ts
 export const Default = {

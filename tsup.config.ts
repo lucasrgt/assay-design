@@ -15,6 +15,7 @@ export default defineConfig([
   {
     entry: {
       index: 'src/public.ts',
+      browser: 'src/browser.ts',
       cli: 'src/cli.ts',
       mcp: 'src/mcp.ts',
       'storybook/preset': 'src/storybook/preset.ts',
