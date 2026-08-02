@@ -8,7 +8,7 @@ const { serveStdio } = vi.hoisted(() => ({ serveStdio: vi.fn((factory: () => unk
 vi.mock('@modelcontextprotocol/server/stdio', () => ({ serveStdio }));
 import { createMcpServer, mcpOperations, startMcp } from '../src/mcp.js';
 import { activateFigma, scanFigma } from '../src/figma.js';
-import storybook, { evaluateStory } from '../src/storybook/preview.js';
+import storybook, { evaluateStory, evaluateStoryPanel } from '../src/storybook/preview.js';
 import { managerEntries, previewAnnotations } from '../src/storybook/preset.js';
 
 async function fixture() {
@@ -47,6 +47,7 @@ describe('Storybook', () => {
   it('evaluates the rendered story with the common core', async () => {
     document.body.innerHTML = '<div data-ds="card"><span data-ds-slot="content"></span></div>';
     expect((await evaluateStory(contract(), 'dashboard')).outcome).toBe('fail');
+    expect((await evaluateStoryPanel(contract(), 'dashboard')).contract.components.some((item) => item.name === 'card')).toBe(true);
     expect(managerEntries(['base'])[0]).toBe('base');
     expect(managerEntries().at(-1)).toMatch(/manager\.js$/);
     expect(previewAnnotations().at(-1)).toMatch(/preview\.js$/);
