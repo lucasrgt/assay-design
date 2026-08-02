@@ -167,7 +167,7 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
       visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => {
         const color = metadataColors[label] ?? 'var(--ad-muted)';
-        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', { style: { color } }, displayName(label)), ...metadataChips(values, color));
+        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color));
       })) : null,
     ),
     element('div', { style: styles.previewFrame },
