@@ -22,5 +22,7 @@ const managerBundle = await readFile('dist/storybook/manager.js', 'utf8');
 const managerChunks = [...managerBundle.matchAll(/from\s+["']\.\.\/(chunk-[^"']+\.js)["']/g)];
 const managerGraph = managerBundle + await Promise.all(managerChunks.map((match) => readFile(`dist/${match[1]}`, 'utf8')));
 if (/storybook\/(?:preview-api|internal\/csf)/.test(managerGraph)) throw new Error('Storybook manager pulled preview-only APIs');
+const previewBundle = await readFile('dist/storybook/preview.js', 'utf8');
+if (/storybook\/(?:preview-api|internal\/csf)/.test(previewBundle)) throw new Error('Storybook preview depends on importer-relative Storybook internals');
 if (!execFileSync(process.execPath, ['dist/cli.js', '--help'], { encoding: 'utf8' }).includes('Usage: assay-design')) throw new Error('CLI binary did not execute');
 console.log(JSON.stringify({ ok: true, files: packed.files.length, size: packed.size }));

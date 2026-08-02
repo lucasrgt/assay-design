@@ -1,5 +1,3 @@
-import { definePreviewAddon } from 'storybook/internal/csf';
-import { addons } from 'storybook/preview-api';
 import { collectDocument, verifyEvidence, type DesignContract } from '../index.js';
 import { REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryControls, type DesignStoryMap } from './shared.js';
 export { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT } from './shared.js';
@@ -9,6 +7,10 @@ type Channel = {
   emit(event: string, payload?: unknown): void;
   on(event: string, listener: () => void): void;
   off(event: string, listener: () => void): void;
+};
+
+type StorybookPreviewGlobal = typeof globalThis & {
+  __STORYBOOK_MODULE_PREVIEW_API__?: { addons?: { getChannel(): Channel } };
 };
 
 let connectedChannel: Channel | undefined;
@@ -34,12 +36,13 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
   setTimeout(answerRequest);
 }
 
-export default definePreviewAddon({
+export default {
   decorators: [
-    (Story, context, channel: Channel = addons.getChannel()) => {
+    (Story: () => unknown, context: { parameters: Record<string, unknown> }, suppliedChannel?: Channel) => {
       const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: DesignStoryMap; controls?: Record<string, DesignStoryControls> } | undefined;
-      if (settings?.contract && settings.surface) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls));
+      const channel = suppliedChannel ?? (globalThis as StorybookPreviewGlobal).__STORYBOOK_MODULE_PREVIEW_API__?.addons?.getChannel();
+      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls));
       return Story();
     },
   ],
-});
+};
