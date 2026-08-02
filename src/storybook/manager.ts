@@ -32,8 +32,8 @@ const styles = {
   workspace: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, alignItems: 'start' },
   inventory: { minWidth: 0 },
   selectable: { width: '100%', color: 'inherit', textAlign: 'left' as const, cursor: 'pointer' },
-  inspector: { position: 'sticky' as const, top: 0, padding: 13, border: `1px solid ${color.line}`, borderRadius: 9, background: color.panel },
-  preview: { width: '100%', height: 260, margin: '10px 0', border: `1px solid ${color.line}`, borderRadius: 7, background: '#08110f' },
+  inspector: { position: 'sticky' as const, top: 0, minWidth: 0 },
+  preview: { display: 'block', width: '100%', height: 300, border: 0, borderRadius: 7, background: '#08110f' },
   link: { color: color.cyan, fontSize: 10, textDecoration: 'none' },
 };
 
@@ -75,18 +75,10 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element('div', { style: styles.empty }, 'Select a declared component.'));
   return element('aside', { style: styles.inspector },
-    element('div', { style: styles.sectionTitle }, element('span', null, 'Live component'), element('span', null, component.tier)),
-    element('div', { style: styles.title }, component.name),
     story
       ? element('iframe', { title: `${component.name} canonical story`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false`, style: styles.preview })
-      : element('div', { style: { ...styles.empty, margin: '10px 0' } }, 'No canonical Storybook story mapped.'),
-    story ? element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', style: styles.link }, 'Open canonical story in canvas →') : null,
-    element('div', { style: { ...styles.detail, marginTop: 12 } },
-      component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
-      component.variants.length ? element('div', null, 'variants ', ...chips(component.variants)) : null,
-      component.states.length ? element('div', null, 'states ', ...chips(component.states)) : null,
-      component.requiredSlots.length ? element('div', null, 'slots ', ...chips(component.requiredSlots)) : null,
-    ),
+      : element('div', { style: styles.empty }, 'No canonical Storybook story mapped.'),
+    story ? element('div', { style: { marginTop: 7, textAlign: 'right' } }, element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', style: styles.link }, 'Open in canvas →')) : null,
   );
 }
 

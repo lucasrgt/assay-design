@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
 
-function Stage({ label, children }: { label: string; children: ReactNode }) {
-  return <main className="canonical-stage"><span className="eyebrow">{label}</span><div className="canonical-subject">{children}</div></main>;
+function Canvas({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+  return <main className={wide ? 'canonical-canvas canonical-canvas-wide' : 'canonical-canvas'}>{children}</main>;
 }
 
 const ButtonSubject = () => <button className="primary" data-ds="button" data-variant="primary" data-state="default" data-role="button"><span data-ds-slot="label">Inspect component</span></button>;
@@ -18,12 +18,12 @@ const meta = { title: 'Assay Design/Canonical Components', parameters: { layout:
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Button: Story = { render: () => <Stage label="ATOM / BUTTON"><ButtonSubject /></Stage> };
-export const Text: Story = { render: () => <Stage label="ATOM / TEXT"><TextSubject /></Stage> };
-export const Badge: Story = { render: () => <Stage label="ATOM / BADGE"><BadgeSubject /></Stage> };
-export const Metric: Story = { render: () => <Stage label="ATOM / METRIC"><MetricSubject /></Stage> };
-export const SearchField: Story = { render: () => <Stage label="MOLECULE / SEARCH FIELD"><SearchSubject /></Stage> };
-export const Card: Story = { render: () => <Stage label="MOLECULE / CARD"><CardSubject /></Stage> };
-export const Navigation: Story = { render: () => <Stage label="ORGANISM / NAVIGATION"><NavigationSubject /></Stage> };
-export const DashboardGrid: Story = { render: () => <Stage label="ORGANISM / DASHBOARD GRID"><GridSubject /></Stage> };
+export const Button: Story = { render: () => <Canvas><ButtonSubject /></Canvas> };
+export const Text: Story = { render: () => <Canvas><TextSubject /></Canvas> };
+export const Badge: Story = { render: () => <Canvas><BadgeSubject /></Canvas> };
+export const Metric: Story = { render: () => <Canvas><MetricSubject /></Canvas> };
+export const SearchField: Story = { render: () => <Canvas><SearchSubject /></Canvas> };
+export const Card: Story = { render: () => <Canvas><CardSubject /></Canvas> };
+export const Navigation: Story = { render: () => <Canvas wide><NavigationSubject /></Canvas> };
+export const DashboardGrid: Story = { render: () => <Canvas wide><GridSubject /></Canvas> };
 export const ApplicationShell: Story = { render: () => <main className="product-shell" data-ds="application-shell"><NavigationSubject /><GridSubject /></main> };
