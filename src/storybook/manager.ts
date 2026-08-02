@@ -218,7 +218,6 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   };
   const passing = payload.outcome === 'pass';
   const findings = findingsOf(payload);
-  const observed = new Set(payload.evidence.nodes.map((node) => node.component)).size;
   const tabs: [Tab, string, number][] = [
     ['inventory', 'Atomic View', payload.contract.components.length],
     ['coverage', 'Coverage', payload.contract.surfaces.length],
@@ -229,7 +228,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
     : element('div', { style: { padding: '14px 0 24px' } }, tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload }));
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('header', { style: styles.header },
-      element('div', null, element('div', { style: styles.title }, payload.contract.name), element('div', { style: styles.meta }, `${payload.contract.components.length} declared · ${observed} observed · ${Object.keys(payload.stories).length} stories · ${payload.evidence.surface}`)),
+      element('div', { style: styles.title }, payload.contract.name),
       element(Badge, { status: passing ? 'positive' : 'negative' }, passing ? 'PASS' : 'FAIL'),
     ),
     element('nav', { style: styles.tabs }, ...tabs.map(([id, label, count]) => element(TabButton, { key: id, active: tab === id, onClick: () => setTab(id), style: { gap: 6 }, children: [label, element(Badge, { key: 'count', compact: true, status: id === 'violations' && count ? 'negative' : 'neutral' }, count)] }))),
