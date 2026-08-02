@@ -5,7 +5,10 @@ import { auditPopulation } from './coherence.js';
 type Dict = Record<string, unknown>;
 export type Tier = 'atom' | 'molecule' | 'organism' | 'template';
 export type FindingCategory = 'components' | 'properties' | 'composition' | 'semantics' | 'coverage' | 'tokens' | 'scale' | 'coherence';
-export interface ComponentContract { name: string; tier: Tier; parts: string[]; variants: string[]; states: string[]; roles: string[]; requiredSlots: string[] }
+export interface ComponentContract {
+  name: string; tier: Tier; parts: string[]; variants: string[]; states: string[]; roles: string[]; requiredSlots: string[];
+  inlineSizing?: 'bounded' | 'full'; allowFullWidth: boolean;
+}
 export interface SurfaceContract { name: string; template?: string; requiredComponents: string[]; states: string[]; themes: string[]; viewports: string[]; locales: string[] }
 export interface DesignContract {
   schema: 1; name: string; extends: string[]; tokenFiles: string[]; components: ComponentContract[]; surfaces: SurfaceContract[];
@@ -20,6 +23,7 @@ export interface StyleDeclaration {
 export interface EvidenceNode {
   component: string; variant?: string; state?: string; role?: string; action?: string; icon?: string; iconIntent?: string;
   text?: string; region?: string; headingLevel?: number; tokens?: string[]; slots?: string[]; parent?: number;
+  widthMode?: 'bounded' | 'full'; widthFlag?: string; inlineSize?: number; containerInlineSize?: number;
 }
 export interface DesignEvidence {
   surface: string; source?: string; nodes: EvidenceNode[]; tokens?: string[]; styles?: StyleDeclaration[];
@@ -64,7 +68,10 @@ export function parseContract(source: string): DesignContract {
     if (!tiers.includes(tier)) throw new Error(`${name}.tier is not an Atomic Design tier`);
     if (seen.has(name)) throw new Error(`component ${name} is declared twice`);
     seen.add(name);
-    return { name, tier, parts: strings(row.parts, `${name}.parts`), variants: strings(row.variants, `${name}.variants`), states: strings(row.states, `${name}.states`), roles: strings(row.roles, `${name}.roles`), requiredSlots: strings(row.required_slots, `${name}.required_slots`) };
+    const inlineSizing = optionalText(row.inline_sizing, `${name}.inline_sizing`) as ComponentContract['inlineSizing'];
+    if (inlineSizing && !['bounded', 'full'].includes(inlineSizing)) throw new Error(`${name}.inline_sizing must be "bounded" or "full"`);
+    if (row.allow_full_width !== undefined && typeof row.allow_full_width !== 'boolean') throw new Error(`${name}.allow_full_width must be a boolean`);
+    return { name, tier, parts: strings(row.parts, `${name}.parts`), variants: strings(row.variants, `${name}.variants`), states: strings(row.states, `${name}.states`), roles: strings(row.roles, `${name}.roles`), requiredSlots: strings(row.required_slots, `${name}.required_slots`), ...(inlineSizing ? { inlineSizing } : {}), allowFullWidth: row.allow_full_width === true };
   });
   const surfaces = surfaceRows.map((value, index): SurfaceContract => {
     const row = record(value, `surfaces[${index}]`);
@@ -222,6 +229,12 @@ export function inspectEvidence(contract: DesignContract, evidence: DesignEviden
     for (const [property, value, allowed] of [['variant', node.variant, spec.variants], ['state', node.state, spec.states], ['role', node.role, spec.roles]] as const) {
       if (value && !allowed.includes(value)) add(`component/undeclared-${property}`, 'properties', `${path}.${property}`, `"${value}" is outside ${node.component}.${property}s`);
     }
+    if (node.widthFlag && node.widthFlag !== 'full') add('component/undeclared-width-mode', 'properties', `${path}.widthFlag`, `"${node.widthFlag}" is not a supported width flag`);
+    if (node.widthFlag === 'full' && !spec.allowFullWidth) add('component/full-width-not-allowed', 'properties', `${path}.widthFlag`, `${node.component} does not allow the full-width exception`);
+    if (spec.inlineSizing && node.widthMode) {
+      const expected = node.widthFlag === 'full' && spec.allowFullWidth ? 'full' : spec.inlineSizing;
+      if (node.widthMode !== expected) add('coherence/inline-sizing', 'coherence', `${path}.widthMode`, `${node.component} renders ${node.widthMode} but its contract expects ${expected}${node.widthMode === 'full' && !node.widthFlag ? '; declare data-ds-width="full" only for a sanctioned full-width instance' : ''}`);
+    }
     for (const slot of missing(node.slots, spec.requiredSlots)) add('atomic/missing-slot', 'composition', path, `${node.component} requires slot "${slot}"`);
     if (node.icon) {
       if (contract.policies.requireIconIntent && !node.iconIntent) add('semantics/missing-icon-intent', 'semantics', path, `Icon "${node.icon}" needs an intent`);
@@ -276,14 +289,24 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
     const value = (name: string) => element.getAttribute(`data-ds-${name}`) ?? element.getAttribute(`data-ui-${name}`) ?? element.getAttribute(`data-${name}`) ?? undefined;
     const component = element.getAttribute('data-ds') ?? element.getAttribute('data-ui') ?? '';
     const region = element.closest('[data-ds-region],[data-ui-region]');
-    const [variant, state, role, action, icon, iconIntent] = ['variant', 'state', 'role', 'action', 'icon', 'icon-intent'].map(value);
+    const [variant, state, role, action, icon, iconIntent, widthFlag] = ['variant', 'state', 'role', 'action', 'icon', 'icon-intent', 'width'].map(value);
     const regionName = region?.getAttribute('data-ds-region') ?? region?.getAttribute('data-ui-region') ?? undefined;
     const slots = [...element.querySelectorAll('[data-ds-slot],[data-ui-slot]')].map((slot) => slot.getAttribute('data-ds-slot') ?? slot.getAttribute('data-ui-slot') ?? '').filter(Boolean);
     const headingLevel = /^H[1-6]$/.test(element.tagName) ? Number(element.tagName[1]) : undefined;
     const tokens = value('token')?.split(/\s+/).filter(Boolean);
     const parent = element.parentElement?.closest(selector);
     const parentIndex = parent ? indices.get(parent) : undefined;
-    return { component, ...(variant ? { variant } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}), ...(parentIndex !== undefined ? { parent: parentIndex } : {}) };
+    const view = element.ownerDocument.defaultView;
+    const box = element.getBoundingClientRect();
+    const container = element.parentElement?.getBoundingClientRect();
+    const style = view?.getComputedStyle(element);
+    const parentStyle = element.parentElement && view?.getComputedStyle(element.parentElement);
+    const pixels = (raw?: string) => Number.parseFloat(raw || '0') || 0;
+    const parentPadding = pixels(parentStyle?.paddingLeft) + pixels(parentStyle?.paddingRight);
+    const containerInlineSize = container?.width ? Math.max(0, container.width - parentPadding) : 0;
+    const cssFull = style?.width === '100%' || Boolean(element.getAttribute('style')?.match(/(?:^|;)\s*width\s*:\s*100%\s*(?:;|$)/i));
+    const widthMode = box.width > 0 && containerInlineSize > 0 ? (Math.abs(box.width - containerInlineSize) <= 1 ? 'full' : 'bounded') : cssFull ? 'full' : undefined;
+    return { component, ...(variant ? { variant } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}), ...(parentIndex !== undefined ? { parent: parentIndex } : {}), ...(widthFlag ? { widthFlag } : {}), ...(widthMode ? { widthMode } : {}), ...(box.width > 0 ? { inlineSize: box.width } : {}), ...(containerInlineSize > 0 ? { containerInlineSize } : {}) };
   });
   return { surface, nodes, ...(coverage ? { coverage } : {}) };
 }

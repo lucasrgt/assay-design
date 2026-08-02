@@ -16,7 +16,7 @@ let connectedChannel: Channel | undefined;
 let emitLatest: (() => void) | undefined;
 const answerRequest = () => emitLatest?.();
 export type StoryArgs = Record<string, string | number | boolean | null>;
-export type DesignStoryControls = Partial<Record<'variants' | 'states', Record<string, StoryArgs>>>;
+export type DesignStoryControls = Partial<Record<'variants' | 'states' | 'widths', Record<string, StoryArgs>>>;
 
 export type DesignPanelPayload = Awaited<ReturnType<typeof verifyEvidence>> & {
   contract: Pick<DesignContract, 'name' | 'components' | 'surfaces'>;

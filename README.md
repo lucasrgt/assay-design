@@ -119,13 +119,26 @@ This is how Assay Design serves greenfield, mid-project recovery, and new featur
 
 Rendered elements expose a language-neutral evidence seam. Existing `data-ui` conventions are accepted as an alias:
 
+```toml
+[[components]]
+name = "button"
+tier = "atom"
+inline_sizing = "bounded"
+allow_full_width = true
+```
+
 ```html
 <main data-ds-region="hero">
   <button data-ds="button" data-variant="primary" data-action="primary">
     <span data-ds-slot="label">Create project</span>
   </button>
+  <button data-ds="button" data-variant="primary" data-ds-width="full">
+    <span data-ds-slot="label">Continue</span>
+  </button>
 </main>
 ```
+
+`inline_sizing = "bounded"` makes container-filling width a detectable inconsistency. `data-ds-width="full"` is an explicit instance-level exception and only passes when `allow_full_width = true`. The collector compares the sizing strategy rather than raw pixels, so different labels or icons may legitimately change a bounded component's natural width.
 
 ```ts
 import { collectDocument, loadContract, verifyEvidence } from 'assay-design';
@@ -154,6 +167,7 @@ export const Default = {
         button: {
           variants: { primary: { variant: 'primary' }, secondary: { variant: 'secondary' } },
           states: { default: { disabled: false }, disabled: { disabled: true } },
+          widths: { bounded: { width: 'bounded' }, full: { width: 'full' } },
         },
       },
       coverage: { states: ['default'] },

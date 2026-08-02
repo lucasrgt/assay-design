@@ -17,6 +17,7 @@ export const canonicalControls = {
   button: {
     variants: { primary: { variant: 'primary' }, secondary: { variant: 'secondary' } },
     states: { default: { state: 'default' }, disabled: { state: 'disabled' } },
+    widths: { bounded: { width: 'bounded' }, full: { width: 'full' } },
   },
   badge: { variants: { neutral: { variant: 'neutral' }, positive: { variant: 'positive' } } },
 };
@@ -37,6 +38,8 @@ variants = ["primary", "secondary"]
 states = ["default", "hover", "active", "focus", "focus-visible", "disabled"]
 roles = ["button"]
 required_slots = ["label"]
+inline_sizing = "bounded"
+allow_full_width = true
 
 [[components]]
 name = "text"
@@ -145,6 +148,7 @@ export function ContractStory({ inconsistent = false }: { inconsistent?: boolean
                 data-state="default"
                 data-role="button"
                 data-action="primary"
+                data-ds-width="full"
                 data-ds-token={inconsistent ? 'space.rogue' : 'color.action.primary'}
               >
                 <span data-ds-slot="label">{inconsistent ? 'break contract' : 'Inspect component'}</span>

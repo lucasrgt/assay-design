@@ -10,6 +10,7 @@ describe('contract', () => {
     const parsed = contract();
     expect(parsed.components.map((item) => item.tier)).toEqual(['atom', 'molecule', 'atom', 'template']);
     expect(parsed.components.find((item) => item.name === 'card')?.parts).toEqual(['button', 'text']);
+    expect(parsed.components.find((item) => item.name === 'button')).toMatchObject({ inlineSizing: 'bounded', allowFullWidth: true });
     expect(parsed.surfaces[0]?.template).toBe('shell');
     const context = designContext(parsed);
     expect(context.graph.edges).toContainEqual({ from: 'design://contract/aurora', relation: 'exemplifies', to: 'rtw://design/button' });
@@ -64,6 +65,8 @@ describe('contract', () => {
     ['schema=1\nname="x"\ncomponents=["x"]', 'must be a table'],
     ['schema=1\nname="x"\n[[components]]\nname="x"\ntier="page"', 'Atomic Design tier'],
     ['schema=1\nname="x"\n[[components]]\nname="x"\ntier="atom"\n[[components]]\nname="x"\ntier="atom"', 'declared twice'],
+    ['schema=1\nname="x"\n[[components]]\nname="x"\ntier="atom"\ninline_sizing="wide"', 'inline_sizing'],
+    ['schema=1\nname="x"\n[[components]]\nname="x"\ntier="atom"\nallow_full_width="yes"', 'allow_full_width'],
     ['schema=1\nname="x"\ntoken_files="x"', 'array of strings'],
     ['schema=1\nname="x"\n[policies]\nmax_primary_actions_per_region=-1', 'non-negative integer'],
     ['schema=1\nname="x"\n[policies]\nmax_heading_jump="no"', 'max_heading_jump'],
@@ -134,6 +137,27 @@ describe('evidence', () => {
     button.setAttribute('data-ds-icon', 'plus');
     button.setAttribute('data-ds-icon-intent', 'add');
     expect(collectDocument(button, 'dashboard').nodes[0]).toMatchObject({ component: 'button', icon: 'plus', iconIntent: 'add' });
+  });
+
+  it('requires container-filling components to declare a sanctioned full-width exception', () => {
+    document.body.innerHTML = `<div id="region"><button data-ds="button" data-variant="secondary"><span data-ds-slot="label">Continue</span></button></div>`;
+    const region = document.querySelector('#region')!;
+    const button = document.querySelector('button')!;
+    Object.defineProperty(region, 'getBoundingClientRect', { value: () => ({ width: 400 }) });
+    Object.defineProperty(button, 'getBoundingClientRect', { value: () => ({ width: 400 }) });
+    const implicit = collectDocument(button, 'dashboard');
+    expect(implicit.nodes[0]).toMatchObject({ component: 'button', widthMode: 'full', inlineSize: 400, containerInlineSize: 400 });
+    expect(inspectEvidence(contract(), implicit)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'coherence/inline-sizing', category: 'coherence' }),
+    ]));
+
+    button.setAttribute('data-ds-width', 'full');
+    expect(inspectEvidence(contract(), collectDocument(button, 'dashboard')).some((finding) => finding.rule === 'coherence/inline-sizing')).toBe(false);
+    const forbidden = contract();
+    forbidden.components.find((component) => component.name === 'button')!.allowFullWidth = false;
+    expect(inspectEvidence(forbidden, collectDocument(button, 'dashboard'))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'component/full-width-not-allowed', category: 'properties' }),
+    ]));
   });
 });
 

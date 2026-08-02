@@ -98,7 +98,7 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
 
 const findingsOf = (payload: DesignPanelPayload): Finding[] => (payload.results as Result[]).flatMap((result) => result.evidence ?? []);
 const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
-const metadataColors: Record<string, string> = { parts: 'var(--ad-accent)', variants: 'var(--ad-agentic)', states: 'var(--ad-warning)', slots: 'var(--ad-story)' };
+const metadataColors: Record<string, string> = { parts: 'var(--ad-accent)', variants: 'var(--ad-agentic)', states: 'var(--ad-warning)', slots: 'var(--ad-story)', widths: 'var(--ad-positive)' };
 const pseudoStateKeys: Record<string, string> = { hover: 'hover', active: 'active', pressed: 'active', click: 'active', focus: 'focus', 'focus-visible': 'focusVisible', 'focus-within': 'focusWithin' };
 const countObserved = (payload: DesignPanelPayload, name: string) => payload.evidence.nodes.filter((node) => node.component === name).length;
 const componentIssues = (payload: DesignPanelPayload, name: string) => {
@@ -170,12 +170,14 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const component = payload.contract.components.find((item) => item.name === name);
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
-  const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['slots', component.requiredSlots]];
+  const widths = component.inlineSizing ? [component.inlineSizing, ...(component.allowFullWidth && component.inlineSizing !== 'full' ? ['full'] : [])] : [];
+  const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['widths', widths], ['slots', component.requiredSlots]];
   const visibleGroups = groups.filter(([, values]) => values.length);
   const componentSelections = selections[name] ?? {};
   const controls = payload.controls?.[name] ?? {};
   const choose = (group: string, value: string) => setSelections((current) => ({ ...current, [name]: { ...current[name], [group]: value } }));
-  const args = Object.assign({}, ...(['variants', 'states'] as const).map((group) => controls[group]?.[componentSelections[group] ?? component[group][0] ?? ''] ?? {}));
+  const selectedValue = (group: 'variants' | 'states' | 'widths') => componentSelections[group] ?? (group === 'widths' ? widths[0] : component[group][0]) ?? '';
+  const args = Object.assign({}, ...(['variants', 'states', 'widths'] as const).map((group) => controls[group]?.[selectedValue(group)] ?? {}));
   const query = argsQuery(args);
   const pseudoState = pseudoStateKeys[componentSelections.states ?? component.states[0] ?? ''];
   const globals = pseudoState ? `pseudo.${pseudoState}:!true` : '';
@@ -185,7 +187,7 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
       visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => {
         const color = metadataColors[label] ?? 'var(--ad-muted)';
-        const control = label === 'variants' || label === 'states' ? controls[label] : undefined;
+        const control = label === 'variants' || label === 'states' || label === 'widths' ? controls[label] : undefined;
         const canSelect = (value: string) => Boolean(control?.[value] || label === 'states' && pseudoStateKeys[value]);
         const interactive = values.some(canSelect);
         const selected = interactive ? componentSelections[label] ?? values[0] : undefined;

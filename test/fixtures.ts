@@ -20,6 +20,8 @@ variants = ["primary", "secondary"]
 states = ["default", "disabled"]
 roles = ["button"]
 required_slots = ["label"]
+inline_sizing = "bounded"
+allow_full_width = true
 [[components]]
 name = "card"
 tier = "molecule"
