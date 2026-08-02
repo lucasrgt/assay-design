@@ -22,7 +22,7 @@ export type DesignPanelPayload = Awaited<ReturnType<typeof verifyEvidence>> & {
   contract: Pick<DesignContract, 'name' | 'components' | 'surfaces'>;
   evidence: ReturnType<typeof collectDocument>;
   stories: Record<string, string>;
-  controls: Record<string, DesignStoryControls>;
+  controls?: Record<string, DesignStoryControls>;
 };
 
 export async function evaluateStory(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2]) {

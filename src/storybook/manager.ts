@@ -171,7 +171,7 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['slots', component.requiredSlots]];
   const visibleGroups = groups.filter(([, values]) => values.length);
   const componentSelections = selections[name] ?? {};
-  const controls = payload.controls[name] ?? {};
+  const controls = payload.controls?.[name] ?? {};
   const choose = (group: string, value: string) => setSelections((current) => ({ ...current, [name]: { ...current[name], [group]: value } }));
   const args = Object.assign({}, ...(['variants', 'states'] as const).map((group) => controls[group]?.[componentSelections[group] ?? component[group][0] ?? ''] ?? {}));
   const query = argsQuery(args);
