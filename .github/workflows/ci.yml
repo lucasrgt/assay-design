@@ -14,6 +14,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: tokei
       - run: npm ci
       - run: npm run check
   benchmark:
