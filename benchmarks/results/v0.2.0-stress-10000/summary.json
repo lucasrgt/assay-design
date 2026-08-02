@@ -7,7 +7,7 @@
     "domains": 8,
     "corrected": 5000,
     "vulnerable": 5000,
-    "avpCriterionVerdicts": 50000
+    "avpCriterionVerdicts": 80000
   },
   "accuracy": {
     "expectedFailures": 5000,
@@ -23,13 +23,13 @@
   "scale": {
     "nodes": 50000,
     "findings": 0,
-    "durationMs": 15.51,
-    "nodesPerSecond": 3223123.98
+    "durationMs": 17.91,
+    "nodesPerSecond": 2791861.17
   },
   "performance": {
-    "durationMs": 136.75,
-    "subjectsPerSecond": 73124.54,
-    "heapDeltaBytes": 15144272
+    "durationMs": 238.1,
+    "subjectsPerSecond": 41998.38,
+    "heapDeltaBytes": 20764960
   },
   "passed": true,
   "limitations": [

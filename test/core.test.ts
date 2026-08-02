@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { collectDocument, designContext, inspectEvidence, loadContract, parseContract, verifyEvidence, type DesignEvidence } from '../src/public.js';
+import { collectDocument, collectStylesheet, designContext, inspectEvidence, inspectStyles, loadContract, parseContract, verifyEvidence, type DesignEvidence } from '../src/public.js';
 import { contract, evidence, source } from './fixtures.js';
 
 describe('contract', () => {
@@ -14,7 +14,7 @@ describe('contract', () => {
     const context = designContext(parsed);
     expect(context.graph.edges).toContainEqual({ from: 'design://contract/aurora', relation: 'exemplifies', to: 'rtw://design/button' });
     expect(context.graph.edges).toContainEqual({ from: 'design://component/card', relation: 'composes', to: 'design://component/button' });
-    expect(context.contract.tokens).toEqual(['color.action.primary']);
+    expect(context.contract.tokens).toEqual({ 'color.action.primary': '#2563eb', 'space.sm': '8px', 'space.md': '12px', 'space.lg': '16px', 'radius.md': '10px', 'fontSize.caption': '12px', 'fontSize.body': '16px' });
     expect(designContext(parseContract(source)).contract.tokens).toEqual(['tokens.json']);
   });
 
@@ -23,7 +23,25 @@ describe('contract', () => {
     const file = join(directory, 'contract.toml');
     await writeFile(file, source);
     await writeFile(join(directory, 'tokens.json'), JSON.stringify({ color: { action: { primary: { $type: 'color', $value: '#00f' } }, $description: 'colors' }, ignored: 1 }));
-    expect((await loadContract(file)).tokenNames).toEqual(['color.action.primary']);
+    expect((await loadContract(file)).tokens).toEqual({ 'color.action.primary': '#00f' });
+  });
+
+  it('merges an org language through extends and detects cycles', async () => {
+    const { mergeContracts } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'assay-design-lang-'));
+    const language = join(root, 'language.toml');
+    const app = join(root, 'app.toml');
+    await writeFile(join(root, 'tokens.json'), JSON.stringify({ space: { sm: { $value: { value: 8, unit: 'px' } } }, color: { brand: { $value: '#111' } } }));
+    await writeFile(language, `schema = 1\nname = "org"\ntoken_files = ["tokens.json"]\n[[components]]\nname = "button"\ntier = "atom"\n`);
+    await writeFile(app, `schema = 1\nname = "traveler"\nextends = ["language.toml"]\n[[components]]\nname = "card"\ntier = "molecule"\nparts = ["button"]\n[[surfaces]]\nname = "home"\nrequired_components = ["card"]\n`);
+    const loaded = await loadContract(app);
+    expect(loaded.name).toBe('traveler');
+    expect(loaded.extends).toEqual(['language.toml']);
+    expect(loaded.components.map((item) => item.name).sort()).toEqual(['button', 'card']);
+    expect(loaded.tokens).toMatchObject({ 'space.sm': '8px', 'color.brand': '#111' });
+    expect(mergeContracts(parseContract(`schema=1\nname="a"\n[[components]]\nname="button"\ntier="atom"\n`), parseContract(`schema=1\nname="b"\n[[components]]\nname="button"\ntier="atom"\nvariants=["primary"]\n`)).components[0]?.variants).toEqual(['primary']);
+    await writeFile(language, `schema = 1\nname = "org"\nextends = ["app.toml"]\n`);
+    await expect(loadContract(app)).rejects.toThrow(/extends cycle/);
   });
 
   it.each([
@@ -43,6 +61,7 @@ describe('contract', () => {
     ['schema=1\nname="x"\n[[components]]\nname="atom"\ntier="atom"\n[[surfaces]]\nname="page"\ntemplate="atom"', 'declared template'],
     ['schema=1\nname="x"\n[[surfaces]]\nname="page"\nrequired_components=["missing"]', 'undeclared component'],
     ['schema=1\nname="x"\n[[surfaces]]\nname="page"\n[[surfaces]]\nname="page"', 'declared twice'],
+    ['schema=1\nname="x"\n[scales]\nspace=2', 'scales.space'],
   ])('rejects invalid input: %s', (input, message) => expect(() => parseContract(input)).toThrow(message));
 });
 
@@ -51,7 +70,7 @@ describe('evidence', () => {
     expect(inspectEvidence(contract(), evidence())).toEqual([]);
     const verdict = await verifyEvidence(contract(), evidence());
     expect(verdict.outcome).toBe('pass');
-    expect(verdict.results).toHaveLength(5);
+    expect(verdict.results).toHaveLength(8);
   });
 
   it('reports every deterministic category with actionable paths', async () => {
@@ -70,7 +89,7 @@ describe('evidence', () => {
     expect(findings.some((item) => item.message.includes('Heading jumps'))).toBe(true);
     const verdict = await verifyEvidence(contract(), broken);
     expect(verdict.outcome).toBe('fail');
-    expect(verdict.results.every((item) => item.status === 'fail')).toBe(true);
+    expect(verdict.results.filter((item) => item.status === 'fail')).toHaveLength(5);
   });
 
   it('distinguishes unknown surfaces and required component coverage', () => {
@@ -101,5 +120,135 @@ describe('evidence', () => {
     button.setAttribute('data-ds-icon', 'plus');
     button.setAttribute('data-ds-icon-intent', 'add');
     expect(collectDocument(button, 'dashboard').nodes[0]).toMatchObject({ component: 'button', icon: 'plus', iconIntent: 'add' });
+  });
+});
+
+const stylesheet = `:root { --space-sm: 8px; --brand: #2563eb; }
+.button { padding: var(--space-sm); border-radius: 10px; color: var(--brand); margin: 0 }
+.rogue { padding: 13px; color: #ff0000; gap: var(--missing); letter-spacing: 0.04em }
+@media (min-width: 700px) { .button { padding: var(--nope, 4px) } }`;
+
+describe('styles', () => {
+  it('resolves references across the whole cascade and preserves the effective value', () => {
+    const split = collectStylesheet({ 'tokens.css': ':root { --space-sm: 8px }', 'ui.css': '.a { gap: var(--space-sm) }' });
+    expect(split).toEqual([{ origin: 'ui.css .a', property: 'gap', value: '8px' }]);
+    const declarations = collectStylesheet({ 'app.css': stylesheet });
+    expect(declarations.find((item) => item.property === 'border-radius')?.origin).toBe('app.css .button');
+    expect(declarations.find((item) => item.origin === 'app.css .button' && item.property === 'padding')?.value).toBe('8px');
+    expect(declarations.find((item) => item.origin === 'app.css .button' && item.property === 'color')?.value).toBe('#2563eb');
+    expect(declarations.find((item) => item.property === 'gap')?.unresolved).toEqual(['--missing']);
+    expect(declarations.filter((item) => item.property.startsWith('--'))).toEqual([]);
+    expect(declarations.filter((item) => item.property === 'padding').at(-1)?.value).toBe('4px');
+  });
+
+  it('separates unresolved references from off-scale one-offs and coherence drift', () => {
+    const findings = inspectStyles(contract(), collectStylesheet({ 'app.css': stylesheet }));
+    const message = (category: string) => findings.filter((item) => item.category === category).map((item) => item.message);
+    expect(message('tokens')).toEqual(['Reference "--missing" resolves to no value in the design language']);
+    expect(message('scale').some((item) => item.includes('"13px"') && item.includes('one-off'))).toBe(true);
+    expect(message('scale').some((item) => item.includes('"#ff0000"'))).toBe(true);
+    expect(message('coherence').some((item) => item.includes('padding') && item.includes('4px') && item.includes('8px'))).toBe(true);
+    expect(findings.some((item) => item.path.includes('letter-spacing'))).toBe(false);
+    expect(findings.some((item) => item.message.includes('"10px"') && item.category === 'scale')).toBe(false);
+  });
+
+  it('skips scale judgment when the language declares no token values', () => {
+    const findings = inspectStyles(parseContract(source), collectStylesheet(stylesheet));
+    expect(findings.map((item) => item.category)).toEqual(['tokens']);
+  });
+
+  it('honours a contract that redeclares which properties a scale governs', async () => {
+    const narrowed = { ...contract(), scales: parseContract(`${source}\n[scales]\nspace = ["gap"]\n`).scales };
+    expect(narrowed.scales).toEqual({ space: ['gap'] });
+    expect(inspectStyles(narrowed, collectStylesheet('.a { padding: 13px; gap: 9px }')).map((item) => item.message)).toEqual(['"9px" is an off-scale space one-off (1 use)']);
+    const verdict = await verifyEvidence(contract(), { ...evidence(), styles: collectStylesheet('.a { padding: 13px }') });
+    expect(verdict.outcome).toBe('fail');
+    expect(verdict.results.filter((item) => item.status === 'fail')).toHaveLength(1);
+  });
+});
+
+describe('population', () => {
+  it('classifies systematic escapes as promote candidates and one-offs as failures', async () => {
+    const { auditPopulation } = await import('../src/coherence.js');
+    const repeated = Array.from({ length: 8 }, (_, index) => ({ origin: `ui.css .chip-${index}`, property: 'padding', value: '13px' }));
+    const report = auditPopulation(contract(), [...repeated, { origin: 'ui.css .chip', property: 'padding', value: '7px' }], 8);
+    expect(report.census.find((item) => item.value === '13px')).toMatchObject({ kind: 'systematic', count: 8, group: 'space' });
+    expect(report.census.find((item) => item.value === '7px')).toMatchObject({ kind: 'oneOff', count: 1 });
+    expect(report.findings.some((item) => item.message.includes('7px'))).toBe(true);
+    expect(report.findings.some((item) => item.message.includes('13px'))).toBe(false);
+  });
+
+  it('collects Tailwind arbitrary utilities and RN style literals', async () => {
+    const { collectUtilities } = await import('../src/coherence.js');
+    const declarations = collectUtilities(`className="text-[13px] p-[7px] data-[state=open]:block" style={{ fontSize: 28, padding: 9 }}`, 'Screen.tsx');
+    expect(declarations).toEqual(expect.arrayContaining([
+      { origin: 'Screen.tsx text', property: 'font-size', value: '13px' },
+      { origin: 'Screen.tsx p', property: 'padding', value: '7px' },
+      { origin: 'Screen.tsx style', property: 'font-size', value: '28px' },
+      { origin: 'Screen.tsx style', property: 'padding', value: '9px' },
+    ]));
+    expect(declarations.some((item) => item.origin.includes('data-'))).toBe(false);
+  });
+
+  it('recalls filtered constraints and promotion candidates before edit', async () => {
+    const { recallDesign } = await import('../src/coherence.js');
+    const full = recallDesign(contract());
+    expect(full.task).toBeUndefined();
+    expect(full.components).toHaveLength(contract().components.length);
+    expect(full.promote).toEqual([]);
+    expect(full.rules.some((rule) => rule.includes('Promote'))).toBe(false);
+
+    const brief = recallDesign(contract(), {
+      task: 'tighten card padding on dashboard',
+      paths: ['src/Card.tsx'],
+      census: [
+        { group: 'fontSize', value: '13px', count: 12, kind: 'systematic', origins: ['Screen.tsx'] },
+        { group: 'space', value: '7px', count: 1, kind: 'oneOff', origins: ['chip'] },
+      ],
+    });
+    expect(brief.components.map((item) => item.name)).toContain('card');
+    expect(brief.surfaces.map((item) => item.name)).toContain('dashboard');
+    expect(brief.promote).toEqual([{ group: 'fontSize', value: '13px', count: 12, kind: 'systematic', origins: ['Screen.tsx'] }]);
+    expect(brief.rules.some((rule) => rule.includes('13px'))).toBe(true);
+    expect(brief.scales.space?.values).toEqual(expect.arrayContaining(['8px', '12px', '16px']));
+
+    expect(recallDesign(contract(), { task: 'edit text copy' }).components.map((item) => item.name)).toEqual(expect.arrayContaining(['text', 'card']));
+    expect(recallDesign(contract(), { paths: ['layouts/shell'] }).surfaces[0]?.name).toBe('dashboard');
+    expect(recallDesign(contract(), { task: 'zzzz-unknown' }).components).toEqual(contract().components);
+    expect(recallDesign({ ...contract(), surfaces: [] }, { task: 'button' }).rules.some((rule) => rule.includes('Cover surface'))).toBe(false);
+    expect(recallDesign({
+      ...contract(),
+      surfaces: [{ name: 'bare', requiredComponents: ['button'], states: [], themes: [], viewports: [], locales: [] }],
+    }, { task: 'bare page' }).surfaces[0]?.name).toBe('bare');
+  });
+
+  it('reports equivalence-class divergence across sibling origins', async () => {
+    const { auditPopulation, auditFleet } = await import('../src/coherence.js');
+    const report = auditPopulation(contract(), [
+      { origin: 'host/Card.tsx', property: 'padding', value: '16px' },
+      { origin: 'traveler/Card.tsx', property: 'padding', value: '12px' },
+    ]);
+    expect(report.findings).toEqual([{ category: 'coherence', path: 'Card.{padding}', message: 'Card uses 2 different padding values: 12px, 16px' }]);
+    const repeated = Array.from({ length: 8 }, (_, index) => ({ origin: `a-${index}`, property: 'padding', value: '13px' }));
+    const fleet = auditFleet(contract(), [
+      { name: 'traveler', declarations: repeated },
+      { name: 'host', declarations: [...repeated, { origin: 'host', property: 'padding', value: '7px' }] },
+    ], 8);
+    expect(fleet.sharedSystematic.some((item) => item.value === '13px')).toBe(true);
+    expect(fleet.ranking[0]?.name).toBe('traveler');
+    expect(fleet.members.find((item) => item.name === 'host')?.findings.some((item) => item.message.includes('7px'))).toBe(true);
+
+    const { planPromotions, applyPromotions } = await import('../src/coherence.js');
+    const plan = planPromotions([{ group: 'space', value: '13px', count: 12, kind: 'systematic', origins: ['a'] }, { group: 'space', value: '7px', count: 1, kind: 'oneOff', origins: ['b'] }]);
+    expect(plan.entries).toEqual([{ group: 'space', value: '13px', path: 'space.promoted.13px', count: 12 }]);
+    const applied = applyPromotions({}, plan);
+    expect(applied.written).toHaveLength(1);
+    expect(applied.tree).toMatchObject({ space: { promoted: { '13px': { $type: 'dimension', $value: { value: 13, unit: 'px' } } } } });
+    const colorPlan = planPromotions([{ group: 'color', value: '#abc', count: 9, kind: 'systematic', origins: ['c'] }]);
+    expect(applyPromotions({}, colorPlan).tree).toMatchObject({ color: { promoted: { abc: { $type: 'color', $value: '#abc' } } } });
+    const stringPlan = planPromotions([{ group: 'motion', value: 'ease-in', count: 9, kind: 'systematic', origins: ['d'] }]);
+    const stringTree = applyPromotions({ motion: { promoted: {} } }, stringPlan).tree as { motion: { promoted: Record<string, { $type: string }> } };
+    expect(stringTree.motion.promoted['ease-in']?.$type).toBe('string');
+    expect(auditFleet(contract(), [{ name: 'empty', declarations: [] }], 8).members[0]?.density).toBe(0);
   });
 });

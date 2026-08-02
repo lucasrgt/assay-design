@@ -10,6 +10,15 @@ export const DOMAINS = [
   ['travel', 'fare-label', 'traveler-field', 'booking-summary', 'booking-shell', 'Reserve trip'],
 ].map(([id, atom, molecule, organism, template, actionLabel]) => ({ id, atom, molecule, organism, template, actionLabel }));
 
+export const TOKENS = {
+  'space.sm': '8px',
+  'space.md': '12px',
+  'space.lg': '16px',
+  'radius.md': '8px',
+  'fontSize.body': '16px',
+  'color.action.primary': '#2563eb',
+};
+
 export function contractSource(domain) {
   return `schema = 1
 name = "${domain.id}"
@@ -63,6 +72,11 @@ export function correctedEvidence(domain) {
       { component: domain.atom, parent: 2, role: 'content', headingLevel: 1 },
       { component: 'button', parent: 1, variant: 'primary', state: 'default', role: 'button', action: 'primary', region: 'main', text: domain.actionLabel, slots: ['label'] },
     ],
+    styles: [
+      { origin: 'ui.css .button', property: 'padding', value: '8px' },
+      { origin: 'ui.css .button', property: 'border-radius', value: '8px' },
+      { origin: 'ui.css .button', property: 'font-size', value: '16px' },
+    ],
     coverage: { states: ['default', 'empty', 'error'], themes: ['light', 'dark'], viewports: ['mobile', 'desktop'], locales: ['en', 'pt-BR'] },
   };
 }
@@ -75,7 +89,13 @@ export function vulnerableEvidence(domain, category) {
   if (category === 'composition') evidence.nodes[3].parent = 0;
   if (category === 'semantics') evidence.nodes.push({ ...evidence.nodes[4], parent: 1 });
   if (category === 'coverage') evidence.coverage.locales = ['en'];
+  if (category === 'tokens') evidence.styles = [{ origin: 'ui.css .button', property: 'color', value: 'unresolved', unresolved: ['--missing'] }];
+  if (category === 'scale') evidence.styles = [{ origin: 'ui.css .chip', property: 'padding', value: '7px' }];
+  if (category === 'coherence') evidence.styles = [
+    { origin: 'host/Card.tsx .card', property: 'padding', value: '8px' },
+    { origin: 'traveler/Card.tsx .card', property: 'padding', value: '16px' },
+  ];
   return evidence;
 }
 
-export const CATEGORIES = ['components', 'properties', 'composition', 'semantics', 'coverage'];
+export const CATEGORIES = ['components', 'properties', 'composition', 'semantics', 'coverage', 'tokens', 'scale', 'coherence'];

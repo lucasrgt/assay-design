@@ -23,15 +23,21 @@ describe('MCP', () => {
   it('shares context, export, and AVP verification operations', async () => {
     const file = await fixture();
     expect((await mcpOperations.context(file)).contract.name).toBe('aurora');
-    expect((await mcpOperations.export(file)).tokenNames).toEqual(['color.action.primary']);
+    expect((await mcpOperations.export(file)).tokens).toEqual({ 'color.action.primary': '#00f' });
     expect((await mcpOperations.verify(file, evidence())).outcome).toBe('pass');
+    expect((await mcpOperations.recall(file, 'card on dashboard', ['Card.tsx'])).components.some((item) => item.name === 'card')).toBe(true);
+    expect((await mcpOperations.recall(file)).components.length).toBeGreaterThan(0);
     const server = createMcpServer(file);
     const tools = (server as any)._registeredTools;
     expect((await tools.design_context.handler({})).structuredContent.contract.name).toBe('aurora');
     expect((await tools.design_export.handler({ contract: file })).structuredContent.name).toBe('aurora');
     expect((await tools.design_verify.handler({ evidence: evidence() })).structuredContent.outcome).toBe('pass');
+    expect((await tools.design_recall.handler({ task: 'card', paths: ['Card.tsx'] })).structuredContent.contract).toBe('aurora');
+    expect((await tools.design_recall.handler({})).structuredContent.paths).toEqual([]);
+    expect((await tools.design_fleet.handler({ members: [{ name: 'app', declarations: [{ origin: 'x', property: 'padding', value: '7px' }] }] })).structuredContent.contract).toBe('aurora');
     expect(startMcp(file)).toBeDefined();
-    expect(serveStdio).toHaveBeenCalledOnce();
+    expect(startMcp()).toBeDefined();
+    expect(serveStdio).toHaveBeenCalled();
   });
 });
 

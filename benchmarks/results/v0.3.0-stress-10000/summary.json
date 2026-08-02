@@ -1,17 +1,17 @@
 {
   "schema": 1,
   "benchmark": "assay-design-multidomain-stress",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "corpus": {
-    "subjects": 1024,
+    "subjects": 10000,
     "domains": 8,
-    "corrected": 512,
-    "vulnerable": 512,
-    "avpCriterionVerdicts": 8192
+    "corrected": 5000,
+    "vulnerable": 5000,
+    "avpCriterionVerdicts": 80000
   },
   "accuracy": {
-    "expectedFailures": 512,
-    "detectedFailures": 512,
+    "expectedFailures": 5000,
+    "detectedFailures": 5000,
     "missedFailures": 0,
     "falseAlarms": 0,
     "unexpectedResults": 0
@@ -23,13 +23,13 @@
   "scale": {
     "nodes": 50000,
     "findings": 0,
-    "durationMs": 27.76,
-    "nodesPerSecond": 1800951.62
+    "durationMs": 16.43,
+    "nodesPerSecond": 3043547.07
   },
   "performance": {
-    "durationMs": 62.1,
-    "subjectsPerSecond": 16490.83,
-    "heapDeltaBytes": 5219512
+    "durationMs": 250.13,
+    "subjectsPerSecond": 39978.51,
+    "heapDeltaBytes": 20711672
   },
   "passed": true,
   "limitations": [

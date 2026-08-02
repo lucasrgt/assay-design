@@ -6,8 +6,8 @@
 | Failures detected | 5000/5000 |
 | False alarms | 0 |
 | Determinism drift | 0/100 |
-| Large surface | 50,000 nodes in 17.91 ms |
-| Subjects per second | 41,998.38 |
+| Large surface | 50,000 nodes in 16.43 ms |
+| Subjects per second | 39,978.51 |
 | Overall | PASS |
 
 ## Limits

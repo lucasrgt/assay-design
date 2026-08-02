@@ -43,7 +43,7 @@ viewports = ["mobile", "desktop"]
 locales = ["en", "pt-BR"]
 `;
 
-export const contract = (): DesignContract => ({ ...parseContract(source), tokenNames: ['color.action.primary'] });
+export const contract = (): DesignContract => ({ ...parseContract(source), tokens: { 'color.action.primary': '#2563eb', 'space.sm': '8px', 'space.md': '12px', 'space.lg': '16px', 'radius.md': '10px', 'fontSize.caption': '12px', 'fontSize.body': '16px' } });
 export const evidence = (): DesignEvidence => ({
   surface: 'dashboard',
   nodes: [

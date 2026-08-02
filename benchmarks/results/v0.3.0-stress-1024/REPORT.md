@@ -1,13 +1,13 @@
-# Assay Design multidomain stress: 10,000 subjects
+# Assay Design multidomain stress: 1,024 subjects
 
 | Measurement | Result |
 | --- | ---: |
-| AVP criterion verdicts | 80,000 |
-| Failures detected | 5000/5000 |
+| AVP criterion verdicts | 8,192 |
+| Failures detected | 512/512 |
 | False alarms | 0 |
 | Determinism drift | 0/100 |
-| Large surface | 50,000 nodes in 17.91 ms |
-| Subjects per second | 41,998.38 |
+| Large surface | 50,000 nodes in 28.48 ms |
+| Subjects per second | 15,445.11 |
 | Overall | PASS |
 
 ## Limits

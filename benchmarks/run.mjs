@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { inspectEvidence, parseContract, verifyEvidence } from '../dist/index.js';
-import { CATEGORIES, DOMAINS, contractSource, correctedEvidence, vulnerableEvidence } from './catalog.mjs';
+import { CATEGORIES, DOMAINS, TOKENS, contractSource, correctedEvidence, vulnerableEvidence } from './catalog.mjs';
 
 const DEFAULT_CORPORA = [1_024, 10_000];
 
@@ -17,7 +17,7 @@ function corpora(argv) {
   return selected.length ? selected : DEFAULT_CORPORA;
 }
 
-const contracts = new Map(DOMAINS.map((domain) => [domain.id, parseContract(contractSource(domain))]));
+const contracts = new Map(DOMAINS.map((domain) => [domain.id, { ...parseContract(contractSource(domain)), tokens: TOKENS }]));
 const round = (value) => Number(value.toFixed(2));
 
 async function calibrate(version) {
