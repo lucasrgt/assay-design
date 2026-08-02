@@ -1,7 +1,7 @@
 import React, { type CSSProperties } from 'react';
 import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, GridIcon, StructureIcon } from '@storybook/icons';
 import { Badge, Button, EmptyTabContent, Link, TabButton } from 'storybook/internal/components';
-import { addons, types, useChannel } from 'storybook/manager-api';
+import { addons, types, useChannel, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
 
@@ -166,11 +166,20 @@ function Violations({ payload }: { payload: DesignPanelPayload }) {
 
 function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const theme = useTheme();
+  const api = useStorybookApi();
+  const { storyId } = useStorybookState();
   const [tab, setTab] = React.useState<Tab>('inventory');
-  const [selected, setSelected] = React.useState(() => payload.contract.components.find((component) => payload.stories[component.name])?.name ?? payload.contract.components[0]?.name ?? '');
+  const activeComponent = Object.entries(payload.stories).find(([, story]) => story === storyId)?.[0];
+  const [selected, setSelected] = React.useState(() => activeComponent ?? payload.contract.components.find((component) => payload.stories[component.name])?.name ?? payload.contract.components[0]?.name ?? '');
   React.useEffect(() => {
-    if (!payload.contract.components.some((component) => component.name === selected)) setSelected(payload.contract.components[0]?.name ?? '');
-  }, [payload, selected]);
+    if (activeComponent && activeComponent !== selected) setSelected(activeComponent);
+    else if (!payload.contract.components.some((component) => component.name === selected)) setSelected(payload.contract.components[0]?.name ?? '');
+  }, [activeComponent, payload, selected]);
+  const selectComponent = (name: string) => {
+    setSelected(name);
+    const story = payload.stories[name];
+    if (story && story !== storyId) api.selectStory(story);
+  };
   const passing = payload.outcome === 'pass';
   const findings = findingsOf(payload);
   const observed = new Set(payload.evidence.nodes.map((node) => node.component)).size;
@@ -181,7 +190,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
     ['violations', 'Violations', findings.length],
   ];
   const content = tab === 'inventory'
-    ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: setSelected })), element(VisualInspector, { payload, name: selected }))
+    ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected }))
     : tab === 'composition' ? element(Composition, { payload }) : tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload });
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('header', { style: styles.header },
