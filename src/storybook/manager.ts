@@ -49,11 +49,25 @@ const styles = {
 };
 
 type ThemeVariables = CSSProperties & Record<`--ad-${string}`, string>;
+const darkenHex = (color: string, amount: number) => {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color);
+  if (!match) return color;
+  const red = Number.parseInt(match[1]!, 16) / 255;
+  const green = Number.parseInt(match[2]!, 16) / 255;
+  const blue = Number.parseInt(match[3]!, 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+  const hue = delta === 0 ? 0 : max === red ? 60 * (((green - blue) / delta) % 6) : max === green ? 60 * ((blue - red) / delta + 2) : 60 * ((red - green) / delta + 4);
+  return `hsl(${hue < 0 ? hue + 360 : hue} ${saturation * 100}% ${Math.max(0, lightness - amount) * 100}%)`;
+};
 const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
   '--ad-canvas': theme.background.content,
   '--ad-panel': theme.background.app,
   '--ad-hover': theme.background.hoverable,
-  '--ad-selected': theme.color.secondary,
+  '--ad-selected': theme.base === 'dark' ? darkenHex(theme.color.secondary, .18) : theme.color.secondary,
   '--ad-selected-text': theme.color.lightest,
   '--ad-line': theme.appBorderColor,
   '--ad-text': theme.fgColor.default,
