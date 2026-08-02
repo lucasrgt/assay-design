@@ -157,8 +157,8 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['slots', component.requiredSlots]];
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
-      element('span', { style: styles.componentMetaTitle }, displayName(component.name)),
       tierBadge(component.tier),
+      element('span', { style: styles.componentMetaTitle }, displayName(component.name)),
       ...groups.filter(([, values]) => values.length).map(([label, values]) => element('span', { key: label, style: styles.componentMetaGroup }, label, ...chips(values))),
     ),
     element('div', { style: styles.previewFrame },
