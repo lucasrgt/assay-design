@@ -6,6 +6,7 @@ import { type StorybookTheme, useTheme } from 'storybook/theming';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
 
 const TAB_ID = `${ADDON_ID}/tab`;
+const COMPOSITION_VIEW = '$composition';
 const element = React.createElement;
 const tiers = ['atom', 'molecule', 'organism', 'template'] as const;
 const AtomIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => element('svg', { ...props, viewBox: '1 1 22 22', fill: 'none', 'aria-hidden': true },
@@ -16,7 +17,7 @@ const AtomIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => element('sv
 );
 const tierIcons = { atom: AtomIcon, molecule: ComponentIcon, organism: GridIcon, template: StructureIcon };
 const tierColors = { atom: 'var(--ad-agentic)', molecule: 'var(--ad-accent)', organism: 'var(--ad-positive)', template: 'var(--ad-warning)' };
-type Tab = 'inventory' | 'composition' | 'coverage' | 'violations';
+type Tab = 'inventory' | 'coverage' | 'violations';
 type Finding = { rule: string; category: string; path: string; message: string };
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
 
@@ -98,7 +99,14 @@ const chips = (values: readonly string[]) => values.length ? values.map((value) 
 
 function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayload; selected: string; onSelect(name: string): void }) {
   const [collapsed, setCollapsed] = React.useState<Record<(typeof tiers)[number], boolean>>({ atom: false, molecule: false, organism: false, template: false });
-  return element(React.Fragment, null, ...tiers.map((tier) => {
+  const edgeCount = payload.contract.components.reduce((sum, component) => sum + component.parts.length, 0);
+  return element(React.Fragment, null,
+    element(Button, { variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === COMPOSITION_VIEW, onClick: () => onSelect(COMPOSITION_VIEW), style: { ...styles.inventoryRow, marginBottom: 8, ...(selected === COMPOSITION_VIEW ? styles.selectedRow : {}) } },
+      element(StructureIcon, { style: { ...styles.treeIcon, ...(selected === COMPOSITION_VIEW ? {} : { color: 'var(--ad-muted)' }) } }),
+      element('span', { style: styles.inventoryName }, 'Composition'),
+      element(Badge, { compact: true, status: 'neutral' }, `${edgeCount} edges`),
+    ),
+    ...tiers.map((tier) => {
     const components = payload.contract.components.filter((component) => component.tier === tier);
     const TierIcon = tierIcons[tier];
     const isCollapsed = collapsed[tier];
@@ -131,10 +139,12 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         );
       }) : [element(EmptyTabContent, { key: 'empty', title: `No ${tier}s declared` })])),
     );
-  }));
+    }),
+  );
 }
 
 function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name: string }) {
+  if (name === COMPOSITION_VIEW) return element('aside', { style: styles.inspector }, element(Composition, { payload }));
   const component = payload.contract.components.find((item) => item.name === name);
   const story = payload.stories[name];
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
@@ -191,9 +201,8 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const activeComponent = Object.entries(payload.stories).find(([, story]) => story === storyId)?.[0];
   const [selected, setSelected] = React.useState(() => activeComponent ?? payload.contract.components.find((component) => payload.stories[component.name])?.name ?? payload.contract.components[0]?.name ?? '');
   React.useEffect(() => {
-    if (activeComponent && activeComponent !== selected) setSelected(activeComponent);
-    else if (!payload.contract.components.some((component) => component.name === selected)) setSelected(payload.contract.components[0]?.name ?? '');
-  }, [activeComponent, payload, selected]);
+    setSelected((current) => activeComponent ?? (current === COMPOSITION_VIEW || payload.contract.components.some((component) => component.name === current) ? current : payload.contract.components[0]?.name ?? ''));
+  }, [activeComponent, payload]);
   const selectComponent = (name: string) => {
     setSelected(name);
     const story = payload.stories[name];
@@ -204,13 +213,12 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const observed = new Set(payload.evidence.nodes.map((node) => node.component)).size;
   const tabs: [Tab, string, number][] = [
     ['inventory', 'Atomic View', payload.contract.components.length],
-    ['composition', 'Composition', payload.contract.components.reduce((sum, item) => sum + item.parts.length, 0)],
     ['coverage', 'Coverage', payload.contract.surfaces.length],
     ['violations', 'Violations', findings.length],
   ];
   const content = tab === 'inventory'
     ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected }))
-    : tab === 'composition' ? element(Composition, { payload }) : tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload });
+    : tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload });
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('header', { style: styles.header },
       element('div', null, element('div', { style: styles.title }, payload.contract.name), element('div', { style: styles.meta }, `${payload.contract.components.length} declared · ${observed} observed · ${Object.keys(payload.stories).length} stories · ${payload.evidence.surface}`)),
