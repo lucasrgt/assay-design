@@ -22,8 +22,8 @@ type Finding = { rule: string; category: string; path: string; message: string }
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
 
 const styles = {
-  root: { display: 'flex', flexDirection: 'column' as const, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box' as const, padding: '32px 20px 0', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
-  header: { display: 'flex', alignItems: 'center', gap: 8, margin: '0 -20px', padding: '0 20px 14px', borderBottom: '1px solid var(--ad-line)' },
+  root: { display: 'flex', flexDirection: 'column' as const, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box' as const, padding: '0 20px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
+  header: { display: 'flex', alignItems: 'center', gap: 8, margin: '0 -20px', padding: '14px 20px', borderBottom: '1px solid var(--ad-line)' },
   title: { margin: 0, color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
   meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
   tabs: { display: 'flex', gap: 0, margin: '0 -20px', padding: 0, borderBottom: '1px solid var(--ad-line)' },
