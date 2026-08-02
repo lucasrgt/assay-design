@@ -16,6 +16,10 @@ type StorybookPreviewGlobal = typeof globalThis & {
 let connectedChannel: Channel | undefined;
 let emitLatest: (() => void) | undefined;
 const answerRequest = () => emitLatest?.();
+const afterStoryPaint = () => {
+  if (typeof requestAnimationFrame !== 'function') return setTimeout(answerRequest);
+  requestAnimationFrame(() => requestAnimationFrame(answerRequest));
+};
 
 export async function evaluateStory(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2]) {
   return verifyEvidence(contract, collectDocument(document, surface, coverage));
@@ -33,7 +37,7 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
     connectedChannel = channel;
     channel.on(REQUEST_EVENT, answerRequest);
   }
-  setTimeout(answerRequest);
+  afterStoryPaint();
 }
 
 export default {
