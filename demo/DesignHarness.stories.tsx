@@ -1,6 +1,18 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { parseContract } from '../src/index.js';
 
+const canonicalStories = {
+  button: 'assay-design-canonical-components--button',
+  text: 'assay-design-canonical-components--text',
+  badge: 'assay-design-canonical-components--badge',
+  metric: 'assay-design-canonical-components--metric',
+  'search-field': 'assay-design-canonical-components--search-field',
+  card: 'assay-design-canonical-components--card',
+  navigation: 'assay-design-canonical-components--navigation',
+  'dashboard-grid': 'assay-design-canonical-components--dashboard-grid',
+  'application-shell': 'assay-design-canonical-components--application-shell',
+};
+
 export const showcaseContract = {
   ...parseContract(`schema = 1
 name = "assay-showcase"
@@ -156,6 +168,7 @@ const meta = {
     designHarness: {
       contract: showcaseContract,
       surface: 'design-overview',
+      stories: canonicalStories,
       coverage: { states: ['default'], themes: ['dark'], viewports: ['desktop'], locales: ['en'] },
     },
   },
@@ -167,5 +180,5 @@ type Story = StoryObj<typeof meta>;
 export const Conformant: Story = {};
 export const Inconsistent: Story = {
   args: { inconsistent: true },
-  parameters: { designHarness: { contract: showcaseContract, surface: 'design-overview', coverage: { states: ['default'], themes: [], viewports: [], locales: ['en'] } } },
+  parameters: { designHarness: { contract: showcaseContract, surface: 'design-overview', stories: canonicalStories, coverage: { states: ['default'], themes: [], viewports: [], locales: ['en'] } } },
 };

@@ -138,15 +138,25 @@ const verdict = await verifyEvidence(
 
 ## Storybook
 
-Add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the Design panel renders the AVP result.
+Add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the Design Contract panel renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
 
 ```ts
 export const Default = {
-  parameters: { designHarness: { contract, surface: 'dashboard', coverage: { states: ['default'] } } },
+  parameters: {
+    designHarness: {
+      contract,
+      surface: 'dashboard',
+      stories: {
+        button: 'design-system-atoms-button--primary',
+        card: 'design-system-molecules-card--default',
+      },
+      coverage: { states: ['default'] },
+    },
+  },
 };
 ```
 
-The addon is optional: Assay Design does not install or replace Storybook.
+The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. The addon is optional; Assay Design does not install or replace Storybook.
 
 The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
 

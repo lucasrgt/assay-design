@@ -29,6 +29,12 @@ const styles = {
   chip: { display: 'inline-block', padding: '3px 6px', margin: '2px 4px 2px 0', border: `1px solid ${color.line}`, borderRadius: 999, color: '#a9bbb4', font: '9px ui-monospace, monospace' },
   empty: { padding: 22, border: `1px dashed ${color.line}`, borderRadius: 8, color: color.muted, textAlign: 'center' as const, fontSize: 11 },
   finding: { padding: '10px 12px', marginBottom: 6, border: `1px solid ${color.line}`, borderLeft: `3px solid ${color.red}`, borderRadius: 7, background: color.panel },
+  workspace: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, alignItems: 'start' },
+  inventory: { minWidth: 0 },
+  selectable: { width: '100%', color: 'inherit', textAlign: 'left' as const, cursor: 'pointer' },
+  inspector: { position: 'sticky' as const, top: 0, padding: 13, border: `1px solid ${color.line}`, borderRadius: 9, background: color.panel },
+  preview: { width: '100%', height: 260, margin: '10px 0', border: `1px solid ${color.line}`, borderRadius: 7, background: '#08110f' },
+  link: { color: color.cyan, fontSize: 10, textDecoration: 'none' },
 };
 
 const findingsOf = (payload: DesignPanelPayload): Finding[] => (payload.results as Result[]).flatMap((result) => result.evidence ?? []);
@@ -39,7 +45,7 @@ const componentIssues = (payload: DesignPanelPayload, name: string) => {
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, value)) : [element('span', { key: 'empty', style: styles.detail }, '—')];
 
-function Inventory({ payload }: { payload: DesignPanelPayload }) {
+function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayload; selected: string; onSelect(name: string): void }) {
   return element(React.Fragment, null, ...tiers.map((tier) => {
     const components = payload.contract.components.filter((component) => component.tier === tier);
     return element('section', { key: tier, style: styles.section },
@@ -48,7 +54,8 @@ function Inventory({ payload }: { payload: DesignPanelPayload }) {
         const observed = countObserved(payload, component.name);
         const issues = componentIssues(payload, component.name).length;
         const status = issues ? `${issues} issue${issues === 1 ? '' : 's'}` : observed ? `${observed} observed` : 'not observed';
-        return element('div', { key: component.name, style: styles.row },
+        const story = payload.stories[component.name];
+        return element('button', { key: component.name, type: 'button', onClick: () => onSelect(component.name), style: { ...styles.row, ...styles.selectable, borderColor: selected === component.name ? color.lime : color.line } },
           element('span', { style: styles.name }, component.name),
           element('div', { style: styles.detail },
             component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
@@ -56,11 +63,31 @@ function Inventory({ payload }: { payload: DesignPanelPayload }) {
             component.states.length ? element('div', null, 'states ', ...chips(component.states)) : null,
             component.requiredSlots.length ? element('div', null, 'slots ', ...chips(component.requiredSlots)) : null,
           ),
-          element('span', { style: { ...styles.status, color: issues ? color.red : observed ? color.lime : color.muted } }, status),
+          element('span', { style: { ...styles.status, color: issues ? color.red : story ? color.lime : color.red } }, story ? status : 'story missing'),
         );
       }) : [element('div', { key: 'empty', style: styles.empty }, `No ${tier}s declared`)]),
     );
   }));
+}
+
+function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name: string }) {
+  const component = payload.contract.components.find((item) => item.name === name);
+  const story = payload.stories[name];
+  if (!component) return element('aside', { style: styles.inspector }, element('div', { style: styles.empty }, 'Select a declared component.'));
+  return element('aside', { style: styles.inspector },
+    element('div', { style: styles.sectionTitle }, element('span', null, 'Live component'), element('span', null, component.tier)),
+    element('div', { style: styles.title }, component.name),
+    story
+      ? element('iframe', { title: `${component.name} canonical story`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false`, style: styles.preview })
+      : element('div', { style: { ...styles.empty, margin: '10px 0' } }, 'No canonical Storybook story mapped.'),
+    story ? element('a', { href: `?path=/story/${encodeURIComponent(story)}`, target: '_top', style: styles.link }, 'Open canonical story in canvas →') : null,
+    element('div', { style: { ...styles.detail, marginTop: 12 } },
+      component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
+      component.variants.length ? element('div', null, 'variants ', ...chips(component.variants)) : null,
+      component.states.length ? element('div', null, 'states ', ...chips(component.states)) : null,
+      component.requiredSlots.length ? element('div', null, 'slots ', ...chips(component.requiredSlots)) : null,
+    ),
+  );
 }
 
 function Composition({ payload }: { payload: DesignPanelPayload }) {
@@ -102,6 +129,10 @@ function Violations({ payload }: { payload: DesignPanelPayload }) {
 
 function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const [tab, setTab] = React.useState<Tab>('inventory');
+  const [selected, setSelected] = React.useState(() => payload.contract.components.find((component) => payload.stories[component.name])?.name ?? payload.contract.components[0]?.name ?? '');
+  React.useEffect(() => {
+    if (!payload.contract.components.some((component) => component.name === selected)) setSelected(payload.contract.components[0]?.name ?? '');
+  }, [payload, selected]);
   const passing = payload.outcome === 'pass';
   const findings = findingsOf(payload);
   const observed = new Set(payload.evidence.nodes.map((node) => node.component)).size;
@@ -111,10 +142,12 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
     ['coverage', 'Coverage', payload.contract.surfaces.length],
     ['violations', 'Violations', findings.length],
   ];
-  const content = tab === 'inventory' ? element(Inventory, { payload }) : tab === 'composition' ? element(Composition, { payload }) : tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload });
+  const content = tab === 'inventory'
+    ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: setSelected })), element(VisualInspector, { payload, name: selected }))
+    : tab === 'composition' ? element(Composition, { payload }) : tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload });
   return element('div', { style: styles.root },
     element('header', { style: styles.header },
-      element('div', null, element('div', { style: styles.eyebrow }, 'Assay Design / live evidence'), element('div', { style: styles.title }, payload.contract.name), element('div', { style: styles.meta }, `${payload.contract.components.length} declared · ${observed} observed · ${payload.evidence.surface}`)),
+      element('div', null, element('div', { style: styles.eyebrow }, 'Assay Design / live evidence'), element('div', { style: styles.title }, payload.contract.name), element('div', { style: styles.meta }, `${payload.contract.components.length} declared · ${observed} observed · ${Object.keys(payload.stories).length} stories · ${payload.evidence.surface}`)),
       element('span', { style: { ...styles.badge, color: passing ? '#142409' : '#2a0c12', background: passing ? color.lime : color.red } }, passing ? 'PASS' : 'FAIL'),
     ),
     element('nav', { style: styles.tabs }, ...tabs.map(([id, label, count]) => element('button', { key: id, onClick: () => setTab(id), style: { ...styles.tab, color: tab === id ? color.text : color.muted, background: tab === id ? color.panel : 'transparent' } }, `${label} ${count}`))),
