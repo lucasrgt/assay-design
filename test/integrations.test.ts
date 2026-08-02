@@ -55,7 +55,7 @@ describe('Storybook', () => {
 
   it('decorates configured stories and emits their verdict', async () => {
     vi.useFakeTimers();
-    const channel = { emit: vi.fn() };
+    const channel = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
     const Story = vi.fn(() => 'story');
     const decorator = (storybook as any).decorators[0];
     expect(decorator(Story, { parameters: {}, channel })).toBe('story');
