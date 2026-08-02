@@ -3,7 +3,7 @@ import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, Compon
 import { Badge, Button, EmptyTabContent, IconButton, TabButton } from 'storybook/internal/components';
 import { addons, types, useAddonState, useChannel, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
-import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload } from './preview.js';
+import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryImplementation, type DesignStoryReference } from './preview.js';
 
 const TAB_ID = `${ADDON_ID}/tab`;
 const COMPOSITION_VIEW = '$composition';
@@ -98,21 +98,23 @@ const themeVariables = (theme: StorybookTheme): ThemeVariables => ({
 
 const findingsOf = (payload: DesignPanelPayload): Finding[] => (payload.results as Result[]).flatMap((result) => result.evidence ?? []);
 const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
-const metadataColors: Record<string, string> = { parts: 'var(--ad-accent)', variants: 'var(--ad-agentic)', states: 'var(--ad-warning)', slots: 'var(--ad-story)', widths: 'var(--ad-positive)' };
+const metadataColors: Record<string, string> = { implementations: 'var(--ad-accent)', parts: 'var(--ad-accent)', variants: 'var(--ad-agentic)', states: 'var(--ad-warning)', slots: 'var(--ad-story)', widths: 'var(--ad-positive)' };
 const pseudoStateKeys: Record<string, string> = { hover: 'hover', active: 'active', pressed: 'active', click: 'active', focus: 'focus', 'focus-visible': 'focusVisible', 'focus-within': 'focusWithin' };
+const implementationsOf = (reference?: DesignStoryReference): DesignStoryImplementation[] => !reference ? [] : typeof reference === 'string' ? [{ id: reference, label: 'Canonical' }] : Array.isArray(reference) ? [...reference] : [reference as DesignStoryImplementation];
+const implementationLabel = (implementation: DesignStoryImplementation) => implementation.label ?? implementation.platform ?? displayName(implementation.id);
 const countObserved = (payload: DesignPanelPayload, name: string) => payload.evidence.nodes.filter((node) => node.component === name).length;
 const componentIssues = (payload: DesignPanelPayload, name: string) => {
   const indexes = new Set(payload.evidence.nodes.flatMap((node, index) => node.component === name ? [index] : []));
   return findingsOf(payload).filter((finding) => [...indexes].some((index) => finding.path === `nodes[${index}]` || finding.path.startsWith(`nodes[${index}].`)));
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
-const metadataChips = (values: readonly string[], color: string, selected?: string, onSelect?: (value: string) => void, canSelect: (value: string) => boolean = () => true) => values.map((value) => {
+const metadataChips = (values: readonly string[], color: string, selected?: string, onSelect?: (value: string) => void, canSelect: (value: string) => boolean = () => true, labelOf: (value: string) => string = displayName) => values.map((value) => {
   const active = selected === value;
   const interactive = Boolean(onSelect && canSelect(value));
   const style = { ...styles.componentMetaChip, color, background: `color-mix(in srgb, ${color} ${active ? 24 : 10}%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} ${active ? 55 : 25}%, transparent)`, ...(interactive ? { border: 0, cursor: 'pointer' } : {}) };
   return interactive
-    ? element('button', { key: value, type: 'button', style, 'aria-pressed': active, onClick: () => onSelect?.(value) }, displayName(value))
-    : element('span', { key: value, style }, displayName(value));
+    ? element('button', { key: value, type: 'button', style, 'aria-pressed': active, onClick: () => onSelect?.(value) }, labelOf(value))
+    : element('span', { key: value, style }, labelOf(value));
 });
 const argsQuery = (args: Record<string, string | number | boolean | null>) => Object.entries(args).map(([key, value]) => `${key}:${String(value)}`).join(';');
 const tierBadge = (tier: (typeof tiers)[number], compact = false) => {
@@ -152,7 +154,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         const observed = countObserved(payload, component.name);
         const issues = componentIssues(payload, component.name).length;
         const status = issues ? `${issues} issue${issues === 1 ? '' : 's'}` : observed ? `${observed} observed` : 'not observed';
-        const story = payload.stories[component.name];
+        const story = implementationsOf(payload.stories[component.name])[0];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
           element(BookmarkHollowIcon, { style: { ...styles.treeIcon, ...(selected === component.name ? {} : { color: 'var(--ad-story)' }) } }),
           element('span', { style: styles.inventoryName, title: component.name }, displayName(component.name)),
@@ -164,17 +166,19 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
   );
 }
 
-function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name: string }) {
+function VisualInspector({ payload, name, storyId, onSelectStory }: { payload: DesignPanelPayload; name: string; storyId?: string; onSelectStory(id: string): void }) {
   const [selections, setSelections] = React.useState<Record<string, Record<string, string>>>({});
   if (name === COMPOSITION_VIEW) return element('aside', { style: { ...styles.inspector, padding: 14 } }, element(Composition, { payload }));
   const component = payload.contract.components.find((item) => item.name === name);
-  const story = payload.stories[name];
+  const implementations = implementationsOf(payload.stories[name]);
+  const implementation = implementations.find((item) => item.id === storyId) ?? implementations[0];
+  const story = implementation?.id;
   if (!component) return element('aside', { style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
   const widths = component.inlineSizing ? [component.inlineSizing, ...(component.allowFullWidth && component.inlineSizing !== 'full' ? ['full'] : [])] : [];
   const groups: [string, readonly string[]][] = [['parts', component.parts], ['variants', component.variants], ['states', component.states], ['widths', widths], ['slots', component.requiredSlots]];
   const visibleGroups = groups.filter(([, values]) => values.length);
   const componentSelections = selections[name] ?? {};
-  const controls = payload.controls?.[name] ?? {};
+  const controls = implementation?.controls ?? payload.controls?.[name] ?? {};
   const choose = (group: string, value: string) => setSelections((current) => ({ ...current, [name]: { ...current[name], [group]: value } }));
   const selectedValue = (group: 'variants' | 'states' | 'widths') => componentSelections[group] ?? (group === 'widths' ? widths[0] : component[group][0]) ?? '';
   const args = Object.assign({}, ...(['variants', 'states', 'widths'] as const).map((group) => controls[group]?.[selectedValue(group)] ?? {}));
@@ -185,13 +189,15 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
-      visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => {
+      implementations.length > 1 || visibleGroups.length ? element('span', { style: styles.componentMetaDetails },
+        ...(implementations.length > 1 ? [element('span', { key: 'implementations', style: styles.componentMetaGroup }, element('span', null, 'Implementations'), ...metadataChips(implementations.map((item) => item.id), metadataColors.implementations!, implementation?.id, onSelectStory, () => true, (id) => implementationLabel(implementations.find((item) => item.id === id)!)))] : []),
+        ...visibleGroups.map(([label, values], index) => {
         const color = metadataColors[label] ?? 'var(--ad-muted)';
         const control = label === 'variants' || label === 'states' || label === 'widths' ? controls[label] : undefined;
         const canSelect = (value: string) => Boolean(control?.[value] || label === 'states' && pseudoStateKeys[value]);
         const interactive = values.some(canSelect);
         const selected = interactive ? componentSelections[label] ?? values[0] : undefined;
-        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color, selected, interactive ? (value) => choose(label, value) : undefined, canSelect));
+        return element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index || implementations.length > 1 ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, element('span', null, displayName(label)), ...metadataChips(values, color, selected, interactive ? (value) => choose(label, value) : undefined, canSelect));
       })) : null,
     ),
     element('div', { style: styles.previewFrame },
@@ -245,14 +251,14 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const api = useStorybookApi();
   const { storyId } = useStorybookState();
   const [tab, setTab] = React.useState<Tab>('inventory');
-  const activeComponent = Object.entries(payload.stories).find(([, story]) => story === storyId)?.[0];
+  const activeComponent = Object.entries(payload.stories).find(([, story]) => implementationsOf(story).some((implementation) => implementation.id === storyId))?.[0];
   const [selected, setSelected] = React.useState(() => activeComponent ?? payload.contract.components.find((component) => payload.stories[component.name])?.name ?? payload.contract.components[0]?.name ?? '');
   React.useEffect(() => {
     setSelected((current) => activeComponent ?? (current === COMPOSITION_VIEW || payload.contract.components.some((component) => component.name === current) ? current : payload.contract.components[0]?.name ?? ''));
   }, [activeComponent, payload]);
   const selectComponent = (name: string) => {
     setSelected(name);
-    const story = payload.stories[name];
+    const story = implementationsOf(payload.stories[name])[0]?.id;
     if (story && story !== storyId) api.selectStory(story);
   };
   const passing = payload.outcome === 'pass';
@@ -263,7 +269,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
     ['violations', 'Violations', findings.length],
   ];
   const content = tab === 'inventory'
-    ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected }))
+    ? element('div', { style: styles.workspace }, element('div', { style: styles.inventory }, element(Inventory, { payload, selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected, storyId, onSelectStory: (id) => api.selectStory(id) }))
     : element('div', { style: { padding: '14px 0 24px' } }, tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload }));
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('header', { style: styles.header },

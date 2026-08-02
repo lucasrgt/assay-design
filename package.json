@@ -93,6 +93,7 @@
     "jsdom": "^27.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.2.8",
+    "react-native-web": "^0.21.2",
     "storybook": "^10.5.5",
     "storybook-addon-pseudo-states": "^10.5.5",
     "tsup": "^8.5.1",

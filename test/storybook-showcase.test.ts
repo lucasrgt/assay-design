@@ -15,6 +15,10 @@ describe('Storybook workbench showcase', () => {
     expect(payload.outcome).toBe('pass');
     expect(payload.contract.components).toHaveLength(9);
     expect(Object.keys(payload.stories)).toHaveLength(9);
+    expect(payload.stories.button).toEqual([
+      expect.objectContaining({ label: 'DOM', platform: 'web' }),
+      expect.objectContaining({ label: 'RN Web', platform: 'react-native-web' }),
+    ]);
     expect(payload.controls).toMatchObject({ button: { states: { disabled: { state: 'disabled' } }, widths: { full: { width: 'full' } } } });
     expect(new Set(payload.evidence.nodes.map((node) => node.component))).toEqual(new Set(payload.contract.components.map((component) => component.name)));
   });

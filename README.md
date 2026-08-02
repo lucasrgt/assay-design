@@ -160,7 +160,10 @@ export const Default = {
       contract,
       surface: 'dashboard',
       stories: {
-        button: 'design-system-atoms-button--primary',
+        button: [
+          { id: 'design-system-atoms-button--dom', label: 'DOM', platform: 'web' },
+          { id: 'design-system-atoms-button--rn-web', label: 'RN Web', platform: 'react-native-web' },
+        ],
         card: 'design-system-molecules-card--default',
       },
       controls: {
@@ -176,7 +179,7 @@ export const Default = {
 };
 ```
 
-The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. Explicit `controls` bind contract variants and data states to real Storybook args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
+The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. A component may map to one story or to several named platform implementations; the inspector switches between them without changing the governing contract. Implementation entries may also carry their own `controls` when adapters expose different Storybook args. Explicit controls bind contract variants, data states, and width modes to real args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
 
 The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
 

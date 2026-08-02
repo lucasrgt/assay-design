@@ -2,7 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { parseContract } from '../src/index.js';
 
 export const canonicalStories = {
-  button: 'assay-design-canonical-components--button',
+  button: [
+    { id: 'assay-design-canonical-components--button-dom', label: 'DOM', platform: 'web' },
+    { id: 'assay-design-canonical-components--button-native-web', label: 'RN Web', platform: 'react-native-web' },
+  ],
   text: 'assay-design-canonical-components--text',
   badge: 'assay-design-canonical-components--badge',
   metric: 'assay-design-canonical-components--metric',
