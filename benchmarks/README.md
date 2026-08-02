@@ -5,7 +5,8 @@ Assay Design publishes two complementary deterministic measurements.
 | Evidence | Question |
 | --- | --- |
 | Domain calibration | Do the design criteria accept corrected controls and reject isolated violations across unrelated UI domains? |
-| Multidomain stress | Does Evidence IR → AVP preserve exact, deterministic verdicts at 1,024 and 10,000 subjects and on a 50,000-node surface? |
+| Coverage guards | Do empty, unobserved, or subjectless audits fail instead of producing zero-drift greens? |
+| Multidomain stress | Do lint observations → AVP preserve exact, deterministic verdicts at 1,024 and 10,000 subjects and on a 50,000-node surface? |
 
 The catalog covers analytics, commerce, healthcare, fintech, government,
 media, education, and travel. Each domain has a different Atomic Design

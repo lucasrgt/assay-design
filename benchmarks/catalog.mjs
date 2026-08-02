@@ -73,9 +73,9 @@ export function correctedEvidence(domain) {
       { component: 'button', parent: 1, variant: 'primary', state: 'default', role: 'button', action: 'primary', region: 'main', text: domain.actionLabel, slots: ['label'] },
     ],
     styles: [
-      { origin: 'ui.css .button', property: 'padding', value: '8px' },
-      { origin: 'ui.css .button', property: 'border-radius', value: '8px' },
-      { origin: 'ui.css .button', property: 'font-size', value: '16px' },
+      { origin: 'ui.css .button', subject: 'button', context: 'primary/default', property: 'padding', value: '8px' },
+      { origin: 'ui.css .button', subject: 'button', context: 'primary/default', property: 'border-radius', value: '8px' },
+      { origin: 'ui.css .button', subject: 'button', context: 'primary/default', property: 'font-size', value: '16px' },
     ],
     coverage: { states: ['default', 'empty', 'error'], themes: ['light', 'dark'], viewports: ['mobile', 'desktop'], locales: ['en', 'pt-BR'] },
   };
@@ -92,8 +92,8 @@ export function vulnerableEvidence(domain, category) {
   if (category === 'tokens') evidence.styles = [{ origin: 'ui.css .button', property: 'color', value: 'unresolved', unresolved: ['--missing'] }];
   if (category === 'scale') evidence.styles = [{ origin: 'ui.css .chip', property: 'padding', value: '7px' }];
   if (category === 'coherence') evidence.styles = [
-    { origin: 'host/Card.tsx .card', property: 'padding', value: '8px' },
-    { origin: 'traveler/Card.tsx .card', property: 'padding', value: '16px' },
+    { origin: 'host/Card.tsx .card', subject: 'card', context: 'default', property: 'padding', value: '8px' },
+    { origin: 'traveler/Card.tsx .card', subject: 'card', context: 'default', property: 'padding', value: '16px' },
   ];
   return evidence;
 }

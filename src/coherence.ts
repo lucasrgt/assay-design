@@ -12,34 +12,87 @@ export interface PopulationReport {
   census: CensusEntry[];
   findings: Finding[];
   systematicThreshold: number;
+  coverage: AuditCoverage;
+}
+
+export interface AuditCoverage {
+  sources: string[];
+  observedSources: string[];
+  unobservedSources: string[];
+  observations: number;
+  comparableSubjects: string[];
+  status: 'complete' | 'partial' | 'empty';
+}
+
+export interface AuditOptions {
+  systematicThreshold?: number;
+  sources?: readonly string[];
+  requireSubjects?: boolean;
 }
 
 const governs = (properties: readonly string[], property: string) => properties.some((entry) => property === entry || property.startsWith(`${entry}-`));
 const literalsOf = (group: string, value: string) => [...value.matchAll(group === 'color' ? /#[0-9a-f]{3,8}\b|\brgba?\([^()]*\)/gi : /-?\d*\.?\d+(?:px|rem|em|ms|s)\b/g)].map(([literal]) => literal.toLowerCase());
 const zero = /^-?0(px|rem|em|ms|s)?$/;
-const familyOf = (origin: string) => {
-  const classes = [...origin.matchAll(/(?:^|[\s/>])\.([A-Za-z_][\w-]*)/g)].map((match) => match[1]!);
-  if (classes.length) return classes.at(-1)!.replace(/--.+$/, '');
-  const leaf = origin.split(/[\\/]/).at(-1)?.split(/\s+/)[0] ?? origin;
-  return leaf.replace(/\.(tsx?|jsx?|astro|css|vue|svelte)$/i, '') || leaf;
-};
-
 const utilityProperty: Record<string, string> = {
   p: 'padding', px: 'padding-inline', py: 'padding-block', pt: 'padding-top', pr: 'padding-right', pb: 'padding-bottom', pl: 'padding-left',
   m: 'margin', mx: 'margin-inline', my: 'margin-block', mt: 'margin-top', mr: 'margin-right', mb: 'margin-bottom', ml: 'margin-left',
-  gap: 'gap', inset: 'inset', top: 'top', right: 'right', bottom: 'bottom', left: 'left',
+  gap: 'gap', 'gap-x': 'column-gap', 'gap-y': 'row-gap', inset: 'inset', top: 'top', right: 'right', bottom: 'bottom', left: 'left',
   text: 'font-size', leading: 'line-height', tracking: 'letter-spacing', rounded: 'border-radius',
   w: 'width', h: 'height', 'min-w': 'min-width', 'min-h': 'min-height', 'max-w': 'max-width', 'max-h': 'max-height',
+  bg: 'background-color', fill: 'fill', stroke: 'stroke', duration: 'transition-duration',
 };
+
+const utilityPattern = /(?:^|[\s"'`:])((?:(?:[a-z][\w-]*):)*!?-?(?:min-w|min-h|max-w|max-h|gap-x|gap-y|px|py|pt|pr|pb|pl|p|mx|my|mt|mr|mb|ml|m|gap|inset|top|right|bottom|left|text|leading|tracking|rounded|w|h|bg|fill|stroke|duration)-(?:\[[^\]\s]+\]|[a-z0-9][\w./-]*))/gi;
+const utilityParts = /^!?(-?)(min-w|min-h|max-w|max-h|gap-x|gap-y|px|py|pt|pr|pb|pl|p|mx|my|mt|mr|mb|ml|m|gap|inset|top|right|bottom|left|text|leading|tracking|rounded|w|h|bg|fill|stroke|duration)-(.+)$/i;
+const spaceUtilities = new Set(['p', 'px', 'py', 'pt', 'pr', 'pb', 'pl', 'm', 'mx', 'my', 'mt', 'mr', 'mb', 'ml', 'gap', 'gap-x', 'gap-y', 'inset', 'top', 'right', 'bottom', 'left']);
+const structuralValues = new Set(['auto', 'current', 'inherit', 'none', 'transparent']);
+const paths = (group: string, value: string) => {
+  const parts = value.split('-');
+  const names = [
+    value,
+    parts.join('.'),
+    ...parts.slice(1).flatMap((_, index) => [
+      `${parts.slice(0, index + 1).join('.')}-${parts.slice(index + 1).join('-')}`,
+      `${parts.slice(0, index + 1).join('-')}.${parts.slice(index + 1).join('-')}`,
+    ]),
+  ];
+  return [...new Set(names.flatMap((name) => group === 'color' ? [`${group}.${name}`, `${group}.${name}.DEFAULT`] : [`${group}.${name}`]))];
+};
+const tokenCandidates = (utility: string, value: string) => {
+  const base = value.split('/')[0]!;
+  if (structuralValues.has(base) || (utility === 'bg' && base.startsWith('gradient-'))) return [];
+  if (spaceUtilities.has(utility)) return paths('space', base);
+  if (utility === 'rounded') return paths('radius', base);
+  if (utility === 'text') return [...paths('fontSize', base), ...paths('color', base)];
+  if (['bg', 'fill', 'stroke'].includes(utility)) return paths('color', base);
+  if (utility === 'duration') return paths('motion', base);
+  return [];
+};
+const classStrings = (source: string) => [...source.matchAll(/(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/g)].flatMap((match) => {
+  const value = match[2] ?? '';
+  const lead = source.slice(Math.max(0, (match.index ?? 0) - 100), match.index ?? 0);
+  const utilities = [...value.matchAll(utilityPattern)];
+  return utilities.length > 1 || /(?:class(?:Name)?|cva|cx|cn|twMerge|variants?)\W[\s\S]*$/i.test(lead) ? [value] : [];
+});
 
 /** Extract StyleDeclarations from Tailwind/NativeWind class strings and RN style literals. */
 export function collectUtilities(source: string, origin = 'utilities'): StyleDeclaration[] {
   const declarations: StyleDeclaration[] = [];
-  for (const [, utility = '', value = ''] of source.matchAll(/(?:^|[\s"'`:])(-?[a-z][\w-]*)-\[([^\]\s]+)\]/g)) {
-    if (utility.startsWith('data-') || utility.startsWith('aria-') || value.includes('var(') || value.includes(':')) continue;
-    const property = utilityProperty[utility] ?? utilityProperty[utility.split('-').slice(0, 2).join('-')!] ?? utilityProperty[utility.split('-')[0]!];
+  for (const classSource of classStrings(source)) for (const [, raw = ''] of classSource.matchAll(utilityPattern)) {
+    const bare = raw.split(':').at(-1)!;
+    const match = bare.match(utilityParts);
+    if (!match) continue;
+    const [, negative = '', utility = '', encoded = ''] = match;
+    const arbitrary = encoded.startsWith('[') && encoded.endsWith(']');
+    const decoded = arbitrary ? encoded.slice(1, -1) : encoded;
+    if (decoded.includes('var(') || decoded.includes(':') || /[A-Z]{2,}/.test(decoded)) continue;
+    const textAlign = utility === 'text' && ['left', 'center', 'right', 'justify', 'start', 'end'].includes(decoded);
+    const strokeWidth = utility === 'stroke' && /^\d/.test(decoded);
+    const property = textAlign ? 'text-align' : strokeWidth ? 'stroke-width' : utilityProperty[utility];
     if (!property) continue;
-    declarations.push({ origin: `${origin} ${utility}`, property, value });
+    const value = `${negative}${decoded}`;
+    const candidates = arbitrary || textAlign || strokeWidth ? [] : tokenCandidates(utility, decoded);
+    declarations.push({ origin: `${origin} ${raw}`, property, value: arbitrary ? value : bare, ...(candidates.length ? { tokenCandidates: candidates } : {}) });
   }
   for (const [, property = '', number = ''] of source.matchAll(/\b(padding|paddingTop|paddingBottom|paddingHorizontal|paddingVertical|margin|marginTop|marginBottom|gap|borderRadius|fontSize)\s*:\s*(\d+)\b/g)) {
     const css = property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`).replace('padding-horizontal', 'padding-inline').replace('padding-vertical', 'padding-block');
@@ -62,19 +115,43 @@ function escapeKey(group: string, value: string) {
 }
 
 /** Census off-scale values and report one-offs + equivalence-class divergence. */
-export function auditPopulation(contract: DesignContract, declarations: readonly StyleDeclaration[], systematicThreshold = 8): PopulationReport {
-  if (!declarations.length || !contract.tokens) return { census: [], findings: [], systematicThreshold };
+export function auditPopulation(contract: DesignContract, declarations: readonly StyleDeclaration[], options: number | AuditOptions = 8): PopulationReport {
+  const settings = typeof options === 'number' ? { systematicThreshold: options } : options;
+  const systematicThreshold = settings.systematicThreshold ?? 8;
+  const inferredSources = [...new Set(declarations.map((item) => item.origin.split(/\s+/)[0]!).filter(Boolean))];
+  const sources = [...new Set(settings.sources?.length ? settings.sources : inferredSources)];
+  const observedSources = sources.filter((source) => declarations.some((item) => item.origin === source || item.origin.startsWith(`${source} `)));
+  const unobservedSources = sources.filter((source) => !observedSources.includes(source));
+  const comparableSubjects = [...new Set(declarations.flatMap((item) => item.subject ? [`${item.subject}${item.context ? `@${item.context}` : ''}`] : []))];
+  const status = declarations.length === 0 ? 'empty' : unobservedSources.length || (settings.requireSubjects && !comparableSubjects.length) ? 'partial' : 'complete';
+  const coverage: AuditCoverage = { sources, observedSources, unobservedSources, observations: declarations.length, comparableSubjects, status };
+  const coverageFindings: Finding[] = [];
+  if (!declarations.length) coverageFindings.push({ rule: 'coverage/no-style-observations', category: 'coverage', path: 'audit.observations', message: 'No style observations were collected; absence of evidence is not conformance' });
+  if (unobservedSources.length) coverageFindings.push({ rule: 'coverage/unobserved-source', category: 'coverage', path: 'audit.sources', message: `No observations were collected from: ${unobservedSources.join(', ')}` });
+  if (settings.requireSubjects && !comparableSubjects.length) coverageFindings.push({ rule: 'coverage/no-comparable-subjects', category: 'coverage', path: 'audit.subjects', message: 'No comparable component subjects were identified; coherence cannot be decided' });
+  const tokenFindings: Finding[] = [];
+  const tokens = contract.tokens;
+  for (const declaration of declarations) {
+    const path = `${declaration.origin} { ${declaration.property} }`;
+    for (const name of declaration.unresolved ?? []) tokenFindings.push({ rule: 'tokens/unresolved-reference', category: 'tokens', path, message: `Reference "${name}" resolves to no value in the design language` });
+    if (declaration.tokenCandidates?.length && tokens && !declaration.tokenCandidates.some((name) => name in tokens)) {
+      tokenFindings.push({ rule: 'tokens/unknown-utility-token', category: 'tokens', path, message: `Utility "${declaration.value}" maps to no declared token (${declaration.tokenCandidates.join(' or ')})` });
+    }
+  }
+  if (!declarations.length || !tokens) return { census: [], findings: [...coverageFindings, ...tokenFindings], systematicThreshold, coverage };
   const scales = scaleIndex(contract);
   const counts = new Map<string, { group: string; value: string; count: number; origins: string[] }>();
   const byFamily = new Map<string, Map<string, Set<string>>>();
 
   for (const declaration of declarations) {
-    const family = familyOf(declaration.origin);
-    const values = byFamily.get(family) ?? new Map<string, Set<string>>();
-    byFamily.set(family, values);
-    const set = values.get(declaration.property) ?? new Set<string>();
-    set.add(declaration.value.toLowerCase());
-    values.set(declaration.property, set);
+    const family = declaration.subject ? `${declaration.subject}${declaration.context ? `@${declaration.context}` : ''}` : undefined;
+    if (family) {
+      const values = byFamily.get(family) ?? new Map<string, Set<string>>();
+      byFamily.set(family, values);
+      const set = values.get(declaration.property) ?? new Set<string>();
+      set.add(declaration.value.toLowerCase());
+      values.set(declaration.property, set);
+    }
 
     for (const { group, properties, values: scale } of scales) {
       if (!scale.size || !governs(properties, declaration.property)) continue;
@@ -93,18 +170,18 @@ export function auditPopulation(contract: DesignContract, declarations: readonly
     .map((row): CensusEntry => ({ ...row, kind: row.count >= systematicThreshold ? 'systematic' : 'oneOff' }))
     .sort((left, right) => right.count - left.count || left.value.localeCompare(right.value));
 
-  const findings: Finding[] = [];
+  const findings: Finding[] = [...coverageFindings, ...tokenFindings];
   for (const entry of census) if (entry.kind === 'oneOff') {
-    findings.push({ category: 'scale', path: entry.origins[0] ?? entry.value, message: `"${entry.value}" is an off-scale ${entry.group} one-off (${entry.count} use${entry.count === 1 ? '' : 's'})` });
+    findings.push({ rule: 'tokens/off-scale-one-off', category: 'scale', path: entry.origins[0] ?? entry.value, message: `"${entry.value}" is an off-scale ${entry.group} one-off (${entry.count} use${entry.count === 1 ? '' : 's'})` });
   }
 
   for (const [family, properties] of byFamily) for (const [property, values] of properties) {
     if (values.size < 2) continue;
     const list = [...values].sort();
-    findings.push({ category: 'coherence', path: `${family}.{${property}}`, message: `${family} uses ${list.length} different ${property} values: ${list.join(', ')}` });
+    findings.push({ rule: 'coherence/property-drift', category: 'coherence', path: `${family}.{${property}}`, message: `${family} uses ${list.length} different ${property} values: ${list.join(', ')}` });
   }
 
-  return { census, findings, systematicThreshold };
+  return { census, findings, systematicThreshold, coverage };
 }
 
 export interface RecallBrief {
@@ -150,27 +227,28 @@ export function recallDesign(contract: DesignContract, options: { task?: string;
   };
 }
 
-export interface FleetMember { name: string; declarations: StyleDeclaration[] }
+export interface FleetMember { name: string; declarations: StyleDeclaration[]; sources?: string[] }
 export interface FleetMemberReport {
   name: string;
   declarations: number;
   census: CensusEntry[];
   findings: Finding[];
   density: number;
+  coverage: AuditCoverage;
 }
 export interface FleetReport {
   contract: string;
   members: FleetMemberReport[];
   sharedSystematic: CensusEntry[];
-  ranking: { name: string; density: number }[];
+  ranking: { name: string; density: number; coverage: AuditCoverage['status'] }[];
 }
 
 /** Cross-app population audit against one shared language. */
 export function auditFleet(contract: DesignContract, members: readonly FleetMember[], systematicThreshold = 8): FleetReport {
   const reports = members.map((member): FleetMemberReport => {
-    const report = auditPopulation(contract, member.declarations, systematicThreshold);
-    const density = member.declarations.length ? report.findings.length / Math.max(member.declarations.length, 1) : 0;
-    return { name: member.name, declarations: member.declarations.length, census: report.census, findings: report.findings, density };
+    const report = auditPopulation(contract, member.declarations, { systematicThreshold, ...(member.sources ? { sources: member.sources } : {}), requireSubjects: true });
+    const density = report.findings.length / Math.max(member.declarations.length, 1);
+    return { name: member.name, declarations: member.declarations.length, census: report.census, findings: report.findings, density, coverage: report.coverage };
   });
   const counts = new Map<string, CensusEntry & { apps: Set<string> }>();
   for (const report of reports) for (const entry of report.census) if (entry.kind === 'systematic') {
@@ -185,7 +263,9 @@ export function auditFleet(contract: DesignContract, members: readonly FleetMemb
     .filter((entry) => entry.apps.size > 1)
     .map((entry) => ({ group: entry.group, value: entry.value, count: entry.count, kind: entry.kind, origins: entry.origins }))
     .sort((left, right) => right.count - left.count || left.value.localeCompare(right.value));
-  const ranking = [...reports].sort((left, right) => left.density - right.density).map(({ name, density }) => ({ name, density }));
+  const ranking = [...reports]
+    .sort((left, right) => Number(left.coverage.status !== 'complete') - Number(right.coverage.status !== 'complete') || left.density - right.density)
+    .map(({ name, density, coverage }) => ({ name, density, coverage: coverage.status }));
   return { contract: contract.name, members: reports, sharedSystematic, ranking };
 }
 
@@ -242,4 +322,3 @@ export function applyPromotions(tree: Record<string, unknown>, plan: PromotePlan
   }
   return { tree: next, written, existed };
 }
-

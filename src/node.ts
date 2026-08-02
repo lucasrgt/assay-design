@@ -31,8 +31,8 @@ export async function loadContract(file = '.design/contract.toml', seen = new Se
     const base = await loadContract(resolve(dir, parent), new Set(seen));
     merged = merged ? mergeContracts(merged, base) : base;
   }
-  const local: DesignContract = { ...parsed, tokens: await loadTokens(absolute, parsed.tokenFiles) };
-  const contract = merged ? mergeContracts(merged, local) : local;
+  parsed.tokens = await loadTokens(absolute, parsed.tokenFiles);
+  const contract = merged ? mergeContracts(merged, parsed, true) : parsed;
   assertComposition(contract);
   return contract;
 }

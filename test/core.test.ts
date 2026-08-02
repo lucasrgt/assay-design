@@ -39,7 +39,21 @@ describe('contract', () => {
     expect(loaded.extends).toEqual(['language.toml']);
     expect(loaded.components.map((item) => item.name).sort()).toEqual(['button', 'card']);
     expect(loaded.tokens).toMatchObject({ 'space.sm': '8px', 'color.brand': '#111' });
-    expect(mergeContracts(parseContract(`schema=1\nname="a"\n[[components]]\nname="button"\ntier="atom"\n`), parseContract(`schema=1\nname="b"\n[[components]]\nname="button"\ntier="atom"\nvariants=["primary"]\n`)).components[0]?.variants).toEqual(['primary']);
+    const sealed = parseContract(`schema=1\nname="a"\n[[components]]\nname="button"\ntier="atom"\n`);
+    const override = parseContract(`schema=1\nname="b"\n[[components]]\nname="button"\ntier="atom"\nvariants=["primary"]\n`);
+    expect(() => mergeContracts(sealed, override)).toThrow(/sealed component:button/);
+    const extensible = parseContract(`schema=1\nname="a"\n[inheritance]\nextension_points=["component:button"]\n[[components]]\nname="button"\ntier="atom"\n`);
+    expect(mergeContracts(extensible, override).components[0]?.variants).toEqual(['primary']);
+    const tokenBase = { ...extensible, tokens: { 'color.brand': '#000' }, extensionPoints: ['token:color.brand'] };
+    expect(mergeContracts(tokenBase, { ...parseContract('schema=1\nname="brand"'), tokens: { 'color.brand': '#fff' } }).tokens?.['color.brand']).toBe('#fff');
+    expect(() => mergeContracts({ ...tokenBase, extensionPoints: [] }, { ...parseContract('schema=1\nname="brand"'), tokens: { 'color.brand': '#fff' } })).toThrow(/sealed token:color.brand/);
+    const opinionated = parseContract('schema=1\nname="org"\n[policies]\nmax_primary_actions_per_region=3\n[scales]\nspace=["gap"]');
+    await writeFile(language, 'schema=1\nname="org"\n[policies]\nmax_primary_actions_per_region=3\n[scales]\nspace=["gap"]');
+    await writeFile(app, 'schema=1\nname="app"\nextends=["language.toml"]');
+    const inherited = await loadContract(app);
+    expect(inherited.policies.maxPrimaryActionsPerRegion).toBe(3);
+    expect(inherited.scales.space).toEqual(['gap']);
+    expect(() => mergeContracts(opinionated, parseContract('schema=1\nname="app"\n[policies]\nmax_primary_actions_per_region=2'), true)).toThrow(/sealed policy:maxPrimaryActionsPerRegion/);
     await writeFile(language, `schema = 1\nname = "org"\nextends = ["app.toml"]\n`);
     await expect(loadContract(app)).rejects.toThrow(/extends cycle/);
   });
@@ -84,16 +98,16 @@ describe('evidence', () => {
       coverage: { states: ['default'], themes: ['light'], viewports: [], locales: [] },
     };
     const findings = inspectEvidence(contract(), broken);
-    expect(new Set(findings.map((item) => item.category))).toEqual(new Set(['components', 'properties', 'composition', 'semantics', 'coverage']));
+    expect(new Set(findings.map((item) => item.category))).toEqual(new Set(['components', 'properties', 'composition', 'semantics', 'coverage', 'tokens']));
     expect(findings.some((item) => item.message.includes('2 primary actions'))).toBe(true);
     expect(findings.some((item) => item.message.includes('Heading jumps'))).toBe(true);
     const verdict = await verifyEvidence(contract(), broken);
     expect(verdict.outcome).toBe('fail');
-    expect(verdict.results.filter((item) => item.status === 'fail')).toHaveLength(5);
+    expect(verdict.results.filter((item) => item.status === 'fail')).toHaveLength(6);
   });
 
   it('distinguishes unknown surfaces and required component coverage', () => {
-    expect(inspectEvidence(contract(), { surface: 'missing', nodes: [] })[0]?.message).toContain('not declared');
+    expect(inspectEvidence(contract(), { surface: 'missing', nodes: [] }).some((item) => item.message.includes('not declared'))).toBe(true);
     const findings = inspectEvidence(contract(), { surface: 'dashboard', nodes: [], coverage: { states: [], themes: [], viewports: [], locales: [] } });
     expect(findings.some((item) => item.message.includes('requires component'))).toBe(true);
   });
@@ -129,9 +143,9 @@ const stylesheet = `:root { --space-sm: 8px; --brand: #2563eb; }
 @media (min-width: 700px) { .button { padding: var(--nope, 4px) } }`;
 
 describe('styles', () => {
-  it('resolves references across the whole cascade and preserves the effective value', () => {
+  it('resolves visible references across stylesheet inputs', () => {
     const split = collectStylesheet({ 'tokens.css': ':root { --space-sm: 8px }', 'ui.css': '.a { gap: var(--space-sm) }' });
-    expect(split).toEqual([{ origin: 'ui.css .a', property: 'gap', value: '8px' }]);
+    expect(split).toEqual([{ origin: 'ui.css .a', subject: '.a', property: 'gap', value: '8px' }]);
     const declarations = collectStylesheet({ 'app.css': stylesheet });
     expect(declarations.find((item) => item.property === 'border-radius')?.origin).toBe('app.css .button');
     expect(declarations.find((item) => item.origin === 'app.css .button' && item.property === 'padding')?.value).toBe('8px');
@@ -150,6 +164,16 @@ describe('styles', () => {
     expect(message('coherence').some((item) => item.includes('padding') && item.includes('4px') && item.includes('8px'))).toBe(true);
     expect(findings.some((item) => item.path.includes('letter-spacing'))).toBe(false);
     expect(findings.some((item) => item.message.includes('"10px"') && item.category === 'scale')).toBe(false);
+  });
+
+  it('validates semantic utility names against declared tokens', async () => {
+    const { collectUtilities } = await import('../src/coherence.js');
+    expect(inspectStyles(contract(), collectUtilities('className="p-lg text-body rounded-md"', 'Button.tsx')).filter((item) => item.category === 'tokens')).toEqual([]);
+    const findings = inspectStyles(contract(), collectUtilities('className="bg-legacy duration-slow"', 'Button.tsx'));
+    expect(findings.filter((item) => item.category === 'tokens').map((item) => item.message)).toEqual([
+      'Utility "bg-legacy" maps to no declared token (color.legacy or color.legacy.DEFAULT)',
+      'Utility "duration-slow" maps to no declared token (motion.slow)',
+    ]);
   });
 
   it('skips scale judgment when the language declares no token values', () => {
@@ -178,16 +202,41 @@ describe('population', () => {
     expect(report.findings.some((item) => item.message.includes('13px'))).toBe(false);
   });
 
-  it('collects Tailwind arbitrary utilities and RN style literals', async () => {
+  it('collects named and arbitrary Tailwind utilities plus RN style literals', async () => {
     const { collectUtilities } = await import('../src/coherence.js');
-    const declarations = collectUtilities(`className="text-[13px] p-[7px] data-[state=open]:block" style={{ fontSize: 28, padding: 9 }}`, 'Screen.tsx');
+    const declarations = collectUtilities(`className="text-[13px] p-[7px] md:p-lg text-body data-[state=open]:block" style={{ fontSize: 28, padding: 9 }}`, 'Screen.tsx');
     expect(declarations).toEqual(expect.arrayContaining([
-      { origin: 'Screen.tsx text', property: 'font-size', value: '13px' },
-      { origin: 'Screen.tsx p', property: 'padding', value: '7px' },
+      { origin: 'Screen.tsx text-[13px]', property: 'font-size', value: '13px' },
+      { origin: 'Screen.tsx p-[7px]', property: 'padding', value: '7px' },
+      { origin: 'Screen.tsx md:p-lg', property: 'padding', value: 'p-lg', tokenCandidates: ['space.lg'] },
+      { origin: 'Screen.tsx text-body', property: 'font-size', value: 'text-body', tokenCandidates: ['fontSize.body', 'color.body', 'color.body.DEFAULT'] },
       { origin: 'Screen.tsx style', property: 'font-size', value: '28px' },
       { origin: 'Screen.tsx style', property: 'padding', value: '9px' },
     ]));
     expect(declarations.some((item) => item.origin.includes('data-'))).toBe(false);
+    const families = collectUtilities('className="rounded-md bg-primary fill-primary stroke-primary duration-fast w-full -mt-sm tracking-wide leading-tight text-center mx-auto"; const locale = "pt-BR";');
+    expect(families.map((item) => item.tokenCandidates ?? [])).toEqual(expect.arrayContaining([
+      ['radius.md'], ['color.primary', 'color.primary.DEFAULT'], ['motion.fast'], ['space.sm'], [],
+    ]));
+    expect(families.some((item) => item.value === 'pt-BR')).toBe(false);
+    expect(families.find((item) => item.value === 'text-center')).toMatchObject({ property: 'text-align' });
+    expect(families.find((item) => item.value === 'text-center')).not.toHaveProperty('tokenCandidates');
+    expect(families.find((item) => item.value === 'mx-auto')?.tokenCandidates).toBeUndefined();
+    expect(collectUtilities('const locale = "pt-BR"')).toEqual([]);
+    expect(collectUtilities('<div className="bg-surface-brand-subtle" />')[0]?.tokenCandidates).toEqual(expect.arrayContaining(['color.surface.brand-subtle']));
+    expect(collectUtilities('<div className="text-hp-green-700" />')[0]?.tokenCandidates).toContain('color.hp-green.700');
+    expect(collectUtilities('<svg className="stroke-2" />')[0]).toMatchObject({ property: 'stroke-width', value: 'stroke-2' });
+    expect(collectUtilities('<svg className="fill-none" />')[0]).not.toHaveProperty('tokenCandidates');
+  });
+
+  it('fails closed when an audit observes nothing or cannot compare subjects', async () => {
+    const { auditPopulation } = await import('../src/coherence.js');
+    const empty = auditPopulation(contract(), [], { sources: ['Screen.tsx'], requireSubjects: true });
+    expect(empty.coverage).toMatchObject({ status: 'empty', observations: 0, unobservedSources: ['Screen.tsx'] });
+    expect(empty.findings.map((item) => item.path)).toEqual(expect.arrayContaining(['audit.observations', 'audit.sources', 'audit.subjects']));
+    const partial = auditPopulation(contract(), [{ origin: 'Screen.tsx p-lg', property: 'padding', value: 'p-lg' }], { sources: ['Screen.tsx'], requireSubjects: true });
+    expect(partial.coverage.status).toBe('partial');
+    expect(partial.findings.some((item) => item.path === 'audit.subjects')).toBe(true);
   });
 
   it('recalls filtered constraints and promotion candidates before edit', async () => {
@@ -225,10 +274,10 @@ describe('population', () => {
   it('reports equivalence-class divergence across sibling origins', async () => {
     const { auditPopulation, auditFleet } = await import('../src/coherence.js');
     const report = auditPopulation(contract(), [
-      { origin: 'host/Card.tsx', property: 'padding', value: '16px' },
-      { origin: 'traveler/Card.tsx', property: 'padding', value: '12px' },
+      { origin: 'host/Card.tsx', subject: 'Card', property: 'padding', value: '16px' },
+      { origin: 'traveler/Card.tsx', subject: 'Card', property: 'padding', value: '12px' },
     ]);
-    expect(report.findings).toEqual([{ category: 'coherence', path: 'Card.{padding}', message: 'Card uses 2 different padding values: 12px, 16px' }]);
+    expect(report.findings).toEqual([{ rule: 'coherence/property-drift', category: 'coherence', path: 'Card.{padding}', message: 'Card uses 2 different padding values: 12px, 16px' }]);
     const repeated = Array.from({ length: 8 }, (_, index) => ({ origin: `a-${index}`, property: 'padding', value: '13px' }));
     const fleet = auditFleet(contract(), [
       { name: 'traveler', declarations: repeated },
@@ -249,6 +298,8 @@ describe('population', () => {
     const stringPlan = planPromotions([{ group: 'motion', value: 'ease-in', count: 9, kind: 'systematic', origins: ['d'] }]);
     const stringTree = applyPromotions({ motion: { promoted: {} } }, stringPlan).tree as { motion: { promoted: Record<string, { $type: string }> } };
     expect(stringTree.motion.promoted['ease-in']?.$type).toBe('string');
-    expect(auditFleet(contract(), [{ name: 'empty', declarations: [] }], 8).members[0]?.density).toBe(0);
+    const empty = auditFleet(contract(), [{ name: 'empty', declarations: [], sources: ['empty.tsx'] }], 8).members[0]!;
+    expect(empty.coverage.status).toBe('empty');
+    expect(empty.findings.map((item) => item.category)).toContain('coverage');
   });
 });

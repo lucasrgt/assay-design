@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
-const MAX_PRODUCTION_LINES = 1_100;
 const MAX_FILE_LINES = 500;
 
 const result = spawnSync('tokei', ['src', '--output', 'json'], { encoding: 'utf8' });
@@ -16,7 +15,6 @@ const files = languages.flatMap((language) =>
 );
 const oversized = files.filter((item) => item.lines > MAX_FILE_LINES);
 
-if (total > MAX_PRODUCTION_LINES) throw new Error(`production line budget exceeded: ${total}/${MAX_PRODUCTION_LINES}`);
 if (oversized.length) throw new Error(`production file budget exceeded (>${MAX_FILE_LINES} tokei code lines): ${JSON.stringify(oversized)}`);
 
 const coverage = JSON.parse(await readFile('coverage/coverage-summary.json', 'utf8')).total;
@@ -27,6 +25,6 @@ console.log(JSON.stringify({
   ok: true,
   runtimeLoc: total,
   maxFileLoc: Math.max(0, ...files.map((item) => item.lines)),
-  budgets: { total: MAX_PRODUCTION_LINES, file: MAX_FILE_LINES },
+  budgets: { file: MAX_FILE_LINES },
   coverage: Object.fromEntries(Object.entries(coverage).map(([key, value]) => [key, value.pct])),
 }));

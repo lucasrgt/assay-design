@@ -2,7 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { inspectEvidence, parseContract, verifyEvidence } from '../dist/index.js';
+import { auditPopulation, inspectEvidence, parseContract, verifyEvidence } from '../dist/index.js';
 import { CATEGORIES, DOMAINS, TOKENS, contractSource, correctedEvidence, vulnerableEvidence } from './catalog.mjs';
 
 const DEFAULT_CORPORA = [1_024, 10_000];
@@ -42,11 +42,23 @@ async function calibrate(version) {
     }
     cases.push({ domain: domain.id, corrected: { findings: controlFindings.length, outcome: controlVerdict.outcome }, mutants });
   }
+  const sample = contracts.get(DOMAINS[0].id);
+  const cleanAudit = auditPopulation(sample, [
+    { origin: 'host.css .button', subject: 'button', context: 'primary/default', property: 'padding', value: '8px' },
+    { origin: 'traveler.css .button', subject: 'button', context: 'primary/default', property: 'padding', value: '8px' },
+  ], { sources: ['host.css', 'traveler.css'], requireSubjects: true });
+  const emptyAudit = auditPopulation(sample, [], { sources: ['empty.tsx'], requireSubjects: true });
+  const blindAudit = auditPopulation(sample, [{ origin: 'screen.tsx p-lg', property: 'padding', value: 'p-lg' }], { sources: ['screen.tsx'], requireSubjects: true });
+  const coverageGuards = {
+    cleanPasses: cleanAudit.coverage.status === 'complete' && !cleanAudit.findings.length,
+    emptyFails: emptyAudit.coverage.status === 'empty' && emptyAudit.findings.some((item) => item.category === 'coverage'),
+    subjectlessFails: blindAudit.coverage.status === 'partial' && blindAudit.findings.some((item) => item.path === 'audit.subjects'),
+  };
   return {
     schema: 1, benchmark: 'assay-design-domain-calibration', version,
     corpus: { domains: DOMAINS.length, correctedControls: DOMAINS.length, mutants: DOMAINS.length * CATEGORIES.length, categories: CATEGORIES },
     accuracy: { detectedMutants: DOMAINS.length * CATEGORIES.length - missedMutants, missedMutants, falseAlarms },
-    cases, passed: !falseAlarms && !missedMutants,
+    coverageGuards, cases, passed: !falseAlarms && !missedMutants && Object.values(coverageGuards).every(Boolean),
     limitations: ['Fixtures are deterministic and synthetic.', 'This measures declared design-system conformance, not subjective beauty or usability.', 'Browser geometry, assistive technology, and model/human judgment remain AVP concerns outside this static benchmark.'],
   };
 }
@@ -103,12 +115,12 @@ async function stress(size, version) {
     scale: { nodes: large.nodes.length, findings: scaleFindings.length, durationMs: round(scaleDurationMs), nodesPerSecond: round((large.nodes.length * 1_000) / Math.max(scaleDurationMs, 0.01)) },
     performance: { durationMs: round(durationMs), subjectsPerSecond: round((size * 1_000) / Math.max(durationMs, 0.01)), heapDeltaBytes: process.memoryUsage().heapUsed - heapBefore },
     passed: detected === vulnerable && !falseAlarms && !unexpectedResults && !drift && !scaleFindings.length,
-    limitations: ['The corpus is deterministic and synthetic.', 'Timing is observational and is not a cross-machine pass threshold.', 'The stress test exercises Evidence IR plus AVP verdict aggregation, not Figma or browser rendering latency.'],
+    limitations: ['The corpus is deterministic and synthetic.', 'Timing is observational and is not a cross-machine pass threshold.', 'The stress test exercises lint evidence plus AVP verdict aggregation, not Figma or browser rendering latency.'],
   };
 }
 
 function report(result) {
-  if (result.benchmark.endsWith('calibration')) return `# Assay Design domain calibration\n\nEight UI domains exercise corrected controls and one isolated mutant for every AVP design criterion.\n\n| Measurement | Result |\n| --- | ---: |\n| Domains | ${result.corpus.domains} |\n| Corrected controls | ${result.corpus.correctedControls} |\n| Mutants detected | ${result.accuracy.detectedMutants}/${result.corpus.mutants} |\n| Missed mutants | ${result.accuracy.missedMutants} |\n| False alarms | ${result.accuracy.falseAlarms} |\n| Overall | ${result.passed ? 'PASS' : 'FAIL'} |\n\nDomains: ${result.cases.map((item) => item.domain).join(', ')}.\n\n## Limits\n\n${result.limitations.map((item) => `- ${item}`).join('\n')}\n`;
+  if (result.benchmark.endsWith('calibration')) return `# Assay Design domain calibration\n\nEight UI domains exercise corrected controls and one isolated mutant for every AVP design criterion.\n\n| Measurement | Result |\n| --- | ---: |\n| Domains | ${result.corpus.domains} |\n| Corrected controls | ${result.corpus.correctedControls} |\n| Mutants detected | ${result.accuracy.detectedMutants}/${result.corpus.mutants} |\n| Missed mutants | ${result.accuracy.missedMutants} |\n| False alarms | ${result.accuracy.falseAlarms} |\n| Coverage guards | ${Object.values(result.coverageGuards).filter(Boolean).length}/3 |\n| Overall | ${result.passed ? 'PASS' : 'FAIL'} |\n\nDomains: ${result.cases.map((item) => item.domain).join(', ')}.\n\n## Limits\n\n${result.limitations.map((item) => `- ${item}`).join('\n')}\n`;
   return `# Assay Design multidomain stress: ${result.corpus.subjects.toLocaleString('en-US')} subjects\n\n| Measurement | Result |\n| --- | ---: |\n| AVP criterion verdicts | ${result.corpus.avpCriterionVerdicts.toLocaleString('en-US')} |\n| Failures detected | ${result.accuracy.detectedFailures}/${result.accuracy.expectedFailures} |\n| False alarms | ${result.accuracy.falseAlarms} |\n| Determinism drift | ${result.determinism.drift}/${result.determinism.runs} |\n| Large surface | ${result.scale.nodes.toLocaleString('en-US')} nodes in ${result.scale.durationMs} ms |\n| Subjects per second | ${result.performance.subjectsPerSecond.toLocaleString('en-US')} |\n| Overall | ${result.passed ? 'PASS' : 'FAIL'} |\n\n## Limits\n\n${result.limitations.map((item) => `- ${item}`).join('\n')}\n`;
 }
 

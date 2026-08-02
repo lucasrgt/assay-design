@@ -27,11 +27,13 @@ describe('MCP', () => {
     expect((await mcpOperations.verify(file, evidence())).outcome).toBe('pass');
     expect((await mcpOperations.recall(file, 'card on dashboard', ['Card.tsx'])).components.some((item) => item.name === 'card')).toBe(true);
     expect((await mcpOperations.recall(file)).components.length).toBeGreaterThan(0);
+    expect((await mcpOperations.audit(file, [], ['empty.tsx'])).coverage.status).toBe('empty');
     const server = createMcpServer(file);
     const tools = (server as any)._registeredTools;
     expect((await tools.design_context.handler({})).structuredContent.contract.name).toBe('aurora');
     expect((await tools.design_export.handler({ contract: file })).structuredContent.name).toBe('aurora');
     expect((await tools.design_verify.handler({ evidence: evidence() })).structuredContent.outcome).toBe('pass');
+    expect((await tools.design_audit.handler({ declarations: [], sources: ['empty.tsx'] })).structuredContent.coverage.status).toBe('empty');
     expect((await tools.design_recall.handler({ task: 'card', paths: ['Card.tsx'] })).structuredContent.contract).toBe('aurora');
     expect((await tools.design_recall.handler({})).structuredContent.paths).toEqual([]);
     expect((await tools.design_fleet.handler({ members: [{ name: 'app', declarations: [{ origin: 'x', property: 'padding', value: '7px' }] }] })).structuredContent.contract).toBe('aurora');

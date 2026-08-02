@@ -1,6 +1,6 @@
 # Assay Design
 
-Assay Design turns a design system into a versioned, declarative contract that agents and tools can verify. It depends directly on [`avp-assay`](https://www.npmjs.com/package/avp-assay): every check returns a normal AVP verdict, so design conformance composes with the same acceptance pipeline as behavior.
+Assay Design is a cross-framework linter for design systems. It uses a versioned, declarative contract to audit Atomic Design structure and consistency across components, screens, apps, and whole product fleets. It does not generate UI code. It depends directly on [`avp-assay`](https://www.npmjs.com/package/avp-assay): every check returns a normal AVP verdict, so design conformance composes with the same acceptance pipeline as behavior.
 
 The three design surfaces have deliberately different jobs:
 
@@ -13,7 +13,7 @@ The three design surfaces have deliberately different jobs:
 ## Start
 
 ```sh
-npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.3.0/assay-design-0.3.0.tgz
+npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.4.0/assay-design-0.4.0.tgz
 npx assay-design init
 npx assay-design doctor
 npx assay-design context
@@ -27,9 +27,9 @@ The release asset is an ordinary `npm pack` tarball and is the current canonical
 
 ## Values, not just names
 
-Vocabulary conformance alone cannot detect divergence, because the names are the one thing every screen and every app copies correctly. Two products both declare `color.primary` and `space.md` and still drift, and a stylesheet whose token references silently resolve to nothing still passes a name-level check. Assay Design therefore loads DTCG **values**, not only token paths, and judges the value that actually lands on screen.
+Vocabulary conformance alone cannot detect divergence, because the names are the one thing every screen and every app copies correctly. Two products both declare `color.primary` and `space.md` and still drift, and a stylesheet whose token references silently resolve to nothing still passes a name-level check. Assay Design therefore loads DTCG **values**, not only token paths, and judges declared or observed values instead of trusting vocabulary alone.
 
-Style evidence is a platform-neutral IR. `collectStylesheet` is the web adapter: it resolves the whole CSS cascade, reports the effective value of each declaration, and records references that bind to nothing. Frameworks without CSS emit the same `StyleDeclaration` shape directly.
+Style adapters emit small, lossy observations for linting. They are not a canonical UI representation and are never codegen input. `collectStylesheet` parses CSS declarations, resolves visible custom-property references, and records references that bind to nothing. Browser adapters remain responsible for the real computed cascade.
 
 ```ts
 import { collectStylesheet, inspectStyles, loadContract } from 'assay-design';
@@ -51,24 +51,30 @@ fontSize = ["font-size"]
 
 ## Promote into the language
 
-Systematic escapes are de-facto tokens. `assay-design promote` writes them into the DTCG token file so the next audit treats them as legal scale values.
+Systematic escapes are candidates for the design language, not proof that they are good decisions. `assay-design promote` therefore emits a proposal by default. Applying its mechanical DTCG patch requires the explicit `--apply` flag and should follow semantic review.
 
 ```sh
 npx assay-design promote --styles ui.css --source src/App.tsx
-npx assay-design promote --styles ui.css --dry-run
+npx assay-design promote --styles ui.css --tokens .design/tokens.tokens.json --apply
 ```
 
 Entries land under `<group>.promoted.<slug>` (for example `space.promoted.13px`). Existing paths are left untouched.
 
 ## Fleet language
 
-Design language belongs to the organization. An app contract declares `extends` to inherit a shared language and may only add local surfaces, components, and token files on top.
+Design language belongs to the organization. An app contract declares `extends` to inherit a shared language and may only add local surfaces, components, and tokens. Inherited definitions are sealed unless the base contract names a deliberate extension point.
 
 ```toml
 # apps/traveler/.design/contract.toml
 schema = 1
 name = "traveler"
 extends = ["../../../packages/design-language/contract.toml"]
+```
+
+```toml
+# packages/design-language/contract.toml
+[inheritance]
+extension_points = ["token:color.brand", "surface:product-home"]
 ```
 
 `assay-design fleet` audits multiple apps against that one language and ranks discipline by finding density. Systematic escapes shared across apps are the strongest promotion candidates.
@@ -105,7 +111,9 @@ The report has two layers:
 | Census `oneOff` | A rare escape from the scale | Fails `design.scale` |
 | Coherence findings | The same component family uses multiple values for one property | Fails `design.coherence` |
 
-`--source` accepts TSX/JS/Astro text and extracts Tailwind arbitrary utilities plus React Native style literals into the same `StyleDeclaration` IR. CSS continues to enter through `--styles`.
+`--source` accepts files or directories, ignores tests/build outputs, and extracts named or arbitrary Tailwind utilities plus React Native style literals as lint observations. CSS continues to enter through `--styles`. Every audit reports observation coverage; an empty scan or a fleet member without comparable component subjects fails closed instead of receiving a zero-drift score.
+
+Findings use stable rule IDs such as `atomic/illegal-tier-nesting`, `tokens/unresolved-reference`, `tokens/off-scale-one-off`, `coherence/property-drift`, and `coverage/no-comparable-subjects`. Adapters only report observations; these rules and their severity belong to the harness core.
 
 This is how Assay Design serves greenfield, mid-project recovery, and new features without pretending that vocabulary conformance alone prevents visual drift. AVP therefore verifies the rendered hierarchy as well as variants, states, roles, slots, semantic icon intents, action/text/heading policies, token binding, value scales, and required surface coverage. Frameworks that do not expose a DOM can emit the same `parent` indices directly.
 
@@ -142,15 +150,15 @@ The addon is optional: Assay Design does not install or replace Storybook.
 
 ## Figma
 
-Build the package, then import [`figma/manifest.json`](./figma/manifest.json) as a development plugin. Paste the output of `assay-design export`; the plugin scans local components and variables, emits the common Evidence IR, and asks the same AVP core for a verdict. It never writes over the Git contract.
+Build the package, then import [`figma/manifest.json`](./figma/manifest.json) as a development plugin. Paste the output of `assay-design export`; the plugin scans local components and variables, emits lint evidence, and asks the same AVP core for a verdict. It never writes over the Git contract.
 
 ## MCP and ecosystem
 
-`assay-design mcp` serves `design_context`, `design_export`, `design_verify`, `design_recall`, and `design_fleet` over stdio. The compact context also emits Agent First Graph URIs. Optional `[links]` relations can point to RTW exemplars (`exemplifies`) or WTW decisions (`establishes`) without taking runtime dependencies on RTW, WTW, NYA, NWC, CSM, or Taskfleet.
+`assay-design mcp` serves `design_context`, `design_export`, `design_verify`, `design_audit`, `design_recall`, and `design_fleet` over stdio. The compact context also emits Agent First Graph URIs. Optional `[links]` relations can point to RTW exemplars (`exemplifies`) or WTW decisions (`establishes`) without taking runtime dependencies on RTW, WTW, NYA, NWC, CSM, or Taskfleet.
 
 ## Mini harness
 
-`npm run check` enforces typecheck, lint, tests, package entrypoints, tokei production budget (≤1,100 code lines total and ≤500 per file), ≥95% line/statement/function coverage, and ≥90% branch coverage. CI runs it on Linux, Windows, and macOS with Node 24.
+`npm run check` enforces typecheck, lint, tests, package entrypoints, ≤500 tokei code lines per production file, ≥95% line/statement/function coverage, and ≥90% branch coverage. CI runs it on Linux, Windows, and macOS with Node 24.
 
 ## Benchmarks
 

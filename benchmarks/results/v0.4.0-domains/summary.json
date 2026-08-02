@@ -1,0 +1,686 @@
+{
+  "schema": 1,
+  "benchmark": "assay-design-domain-calibration",
+  "version": "0.4.0",
+  "corpus": {
+    "domains": 8,
+    "correctedControls": 8,
+    "mutants": 64,
+    "categories": [
+      "components",
+      "properties",
+      "composition",
+      "semantics",
+      "coverage",
+      "tokens",
+      "scale",
+      "coherence"
+    ]
+  },
+  "accuracy": {
+    "detectedMutants": 64,
+    "missedMutants": 0,
+    "falseAlarms": 0
+  },
+  "coverageGuards": {
+    "cleanPasses": true,
+    "emptyFails": true,
+    "subjectlessFails": true
+  },
+  "cases": [
+    {
+      "domain": "analytics",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "commerce",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "healthcare",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "fintech",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "government",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "media",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "education",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    },
+    {
+      "domain": "travel",
+      "corrected": {
+        "findings": 0,
+        "outcome": "pass"
+      },
+      "mutants": [
+        {
+          "category": "components",
+          "findings": 1,
+          "detectedCategories": [
+            "components"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "properties",
+          "findings": 1,
+          "detectedCategories": [
+            "properties"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "composition",
+          "findings": 1,
+          "detectedCategories": [
+            "composition"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "semantics",
+          "findings": 1,
+          "detectedCategories": [
+            "semantics"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coverage",
+          "findings": 1,
+          "detectedCategories": [
+            "coverage"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "tokens",
+          "findings": 1,
+          "detectedCategories": [
+            "tokens"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "scale",
+          "findings": 1,
+          "detectedCategories": [
+            "scale"
+          ],
+          "outcome": "fail",
+          "exact": true
+        },
+        {
+          "category": "coherence",
+          "findings": 1,
+          "detectedCategories": [
+            "coherence"
+          ],
+          "outcome": "fail",
+          "exact": true
+        }
+      ]
+    }
+  ],
+  "passed": true,
+  "limitations": [
+    "Fixtures are deterministic and synthetic.",
+    "This measures declared design-system conformance, not subjective beauty or usability.",
+    "Browser geometry, assistive technology, and model/human judgment remain AVP concerns outside this static benchmark."
+  ]
+}

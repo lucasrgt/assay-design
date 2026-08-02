@@ -1,7 +1,7 @@
 {
   "name": "assay-design",
-  "version": "0.3.0",
-  "description": "Declarative design-system contracts verified by AVP across code, Storybook, and Figma.",
+  "version": "0.4.0",
+  "description": "Cross-framework linter for design-system, Atomic Design, screen, and multi-app consistency.",
   "type": "module",
   "license": "MIT",
   "author": "Lucas Tinoco",

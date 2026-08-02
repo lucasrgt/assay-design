@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from 'node:fs';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectStylesheet, designContext, verifyEvidence, type DesignEvidence } from './index.js';
@@ -55,10 +55,33 @@ viewports = ["mobile", "desktop"]
 locales = ["en"]
 `;
 const tokenTemplate = { color: { action: { primary: { $type: 'color', $value: '#2563eb' } } }, space: { control: { $type: 'dimension', $value: { value: 8, unit: 'px' } } } };
-const usage = 'Usage: assay-design <init|doctor|context|recall|check|audit|fleet|promote|export|mcp> [--contract path] [--evidence path] [--styles path] [--source path] [--member name=path] [--task text] [--path path] [--threshold n] [--tokens path] [--dry-run] [--out path]';
+const usage = 'Usage: assay-design <init|doctor|context|recall|check|audit|fleet|promote|export|mcp> [--contract path] [--evidence path] [--styles file-or-dir] [--source file-or-dir] [--member name=file-or-dir] [--task text] [--path path] [--threshold n] [--tokens path --apply] [--out path]';
 const option = (args: string[], name: string) => { const index = args.indexOf(name); return index >= 0 ? args[index + 1] : undefined; };
 const repeated = (args: string[], name: string) => args.flatMap((value, index) => value === name && args[index + 1] ? [args[index + 1]!] : []);
 const absent = async (path: string) => { try { await access(path); return false; } catch { return true; } };
+const supported = /\.(css|tsx?|jsx?|astro|vue|svelte)$/i;
+const ignoredDirectories = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage']);
+
+async function expandInputs(inputs: readonly string[]): Promise<string[]> {
+  const walk = async (path: string): Promise<string[]> => {
+    const absolute = resolve(path);
+    const info = await stat(absolute);
+    if (info.isFile()) return supported.test(absolute) && !/\.(test|spec|stories)\.[^.]+$/i.test(absolute) ? [absolute] : [];
+    if (!info.isDirectory()) return [];
+    const entries = await readdir(absolute, { withFileTypes: true });
+    return (await Promise.all(entries.flatMap((entry) => ignoredDirectories.has(entry.name) ? [] : [walk(resolve(absolute, entry.name))]))).flat();
+  };
+  return [...new Set((await Promise.all(inputs.map(walk))).flat())].sort();
+}
+
+async function scanInputs(inputs: readonly string[]) {
+  const sources = await expandInputs(inputs);
+  const css = sources.filter((path) => /\.css$/i.test(path));
+  const code = sources.filter((path) => !/\.css$/i.test(path));
+  const sheets = Object.fromEntries(await Promise.all(css.map(async (path) => [path, await readFile(path, 'utf8')])));
+  const declarations = [...(css.length ? collectStylesheet(sheets) : []), ...(await Promise.all(code.map(async (path) => collectUtilities(await readFile(path, 'utf8'), path)))).flat()];
+  return { sources, declarations };
+}
 
 export async function runCli(args: string[], io: CliIo = { out: console.log, error: console.error }): Promise<number> {
   const [command] = args;
@@ -84,15 +107,11 @@ export async function runCli(args: string[], io: CliIo = { out: console.log, err
     return 0;
   }
   const loadStyles = async () => {
-    const styles = repeated(args, '--styles');
-    const sources = repeated(args, '--source');
-    const fromCss = styles.length ? collectStylesheet(Object.fromEntries(await Promise.all(styles.map(async (path) => [path, await readFile(resolve(path), 'utf8')])))) : [];
-    const fromSource = (await Promise.all(sources.map(async (path) => collectUtilities(await readFile(resolve(path), 'utf8'), path)))).flat();
-    return [...fromCss, ...fromSource];
+    return scanInputs([...repeated(args, '--styles'), ...repeated(args, '--source')]);
   };
   if (command === 'recall') {
-    const styles = await loadStyles();
-    const census = styles.length ? auditPopulation(contract, styles, Number(option(args, '--threshold') ?? 8)).census : [];
+    const scan = await loadStyles();
+    const census = scan.declarations.length ? auditPopulation(contract, scan.declarations, Number(option(args, '--threshold') ?? 8)).census : [];
     const task = option(args, '--task');
     const brief = recallDesign(contract, { ...(task ? { task } : {}), paths: repeated(args, '--path'), census });
     const serialized = `${JSON.stringify(brief, null, 2)}\n`;
@@ -110,14 +129,7 @@ export async function runCli(args: string[], io: CliIo = { out: console.log, err
       groups.set(name, [...(groups.get(name) ?? []), path]);
     }
     if (!groups.size) throw new Error('fleet requires at least one --member name=path');
-    const members = await Promise.all([...groups].map(async ([name, paths]) => ({
-      name,
-      declarations: (await Promise.all(paths.map(async (path) => {
-        const absolute = resolve(path);
-        const text = await readFile(absolute, 'utf8');
-        return /\.css$/i.test(absolute) ? collectStylesheet({ [absolute]: text }) : collectUtilities(text, absolute);
-      }))).flat(),
-    })));
+    const members = await Promise.all([...groups].map(async ([name, paths]) => ({ name, ...await scanInputs(paths) })));
     const report = auditFleet(contract, members, Number(option(args, '--threshold') ?? 8));
     const serialized = `${JSON.stringify(report, null, 2)}\n`;
     const destination = option(args, '--out');
@@ -125,22 +137,25 @@ export async function runCli(args: string[], io: CliIo = { out: console.log, err
     return report.members.some((member) => member.findings.length) ? 1 : 0;
   }
   if (command === 'promote') {
-    const report = auditPopulation(contract, await loadStyles(), Number(option(args, '--threshold') ?? 8));
+    const scan = await loadStyles();
+    const report = auditPopulation(contract, scan.declarations, { systematicThreshold: Number(option(args, '--threshold') ?? 8), sources: scan.sources });
     const plan = planPromotions(report.census);
     const tokenPath = resolve(option(args, '--tokens') ?? (contract.tokenFiles[0] ? resolve(dirname(contractPath), contract.tokenFiles[0]) : resolve(dirname(contractPath), 'tokens.tokens.json')));
     const existing = await absent(tokenPath) ? {} : JSON.parse(await readFile(tokenPath, 'utf8')) as Record<string, unknown>;
     const applied = applyPromotions(existing, plan);
-    if (!args.includes('--dry-run')) {
+    const apply = args.includes('--apply');
+    if (apply) {
       await mkdir(dirname(tokenPath), { recursive: true });
       await writeFile(tokenPath, `${JSON.stringify(applied.tree, null, 2)}\n`, 'utf8');
     }
-    const serialized = `${JSON.stringify({ contract: contract.name, tokens: tokenPath, dryRun: args.includes('--dry-run'), written: applied.written, existed: applied.existed, skipped: plan.skipped.length }, null, 2)}\n`;
+    const serialized = `${JSON.stringify({ contract: contract.name, tokens: tokenPath, applied: apply, proposals: applied.written, existed: applied.existed, skipped: plan.skipped.length, coverage: report.coverage }, null, 2)}\n`;
     const destination = option(args, '--out');
     if (destination) await writeFile(resolve(destination), serialized, 'utf8'); else io.out(serialized.trimEnd());
     return applied.written.length || applied.existed.length ? 0 : plan.entries.length ? 0 : 1;
   }
   if (command === 'audit') {
-    const report = auditPopulation(contract, await loadStyles(), Number(option(args, '--threshold') ?? 8));
+    const scan = await loadStyles();
+    const report = auditPopulation(contract, scan.declarations, { systematicThreshold: Number(option(args, '--threshold') ?? 8), sources: scan.sources, requireSubjects: true });
     const serialized = `${JSON.stringify(report, null, 2)}\n`;
     const destination = option(args, '--out');
     if (destination) await writeFile(resolve(destination), serialized, 'utf8'); else io.out(serialized.trimEnd());
@@ -148,7 +163,8 @@ export async function runCli(args: string[], io: CliIo = { out: console.log, err
   }
   const verify = async () => {
     const evidence = JSON.parse(await readFile(resolve(option(args, '--evidence') ?? ''), 'utf8')) as DesignEvidence;
-    evidence.styles = [...(evidence.styles ?? []), ...await loadStyles()];
+    const scan = await loadStyles();
+    evidence.styles = [...(evidence.styles ?? []), ...scan.declarations];
     return verifyEvidence(contract, evidence);
   };
   const output = command === 'context' ? designContext(contract) : command === 'export' ? contract : await verify();

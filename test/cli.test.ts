@@ -67,11 +67,11 @@ describe('CLI', () => {
     const many = join(root, 'many.tsx');
     await writeFile(many, `className="${Array.from({ length: 8 }, () => 'p-[13px]').join(' ')}"`);
     output = [];
-    expect(await runCli(['promote', '--contract', contract, '--source', many, '--dry-run'], io)).toBe(0);
-    expect(JSON.parse(output[0]!).written[0].path).toBe('space.promoted.13px');
+    expect(await runCli(['promote', '--contract', contract, '--source', many], io)).toBe(0);
+    expect(JSON.parse(output[0]!).proposals[0].path).toBe('space.promoted.13px');
     const tokensOut = join(root, 'promoted.tokens.json');
     output = [];
-    expect(await runCli(['promote', '--contract', contract, '--source', many, '--tokens', tokensOut], io)).toBe(0);
+    expect(await runCli(['promote', '--contract', contract, '--source', many, '--tokens', tokensOut, '--apply'], io)).toBe(0);
     expect(JSON.parse(await readFile(tokensOut, 'utf8')).space.promoted['13px'].$value).toEqual({ value: 13, unit: 'px' });
     await writeFile(evidence, JSON.stringify({ surface: 'unknown', nodes: [] }));
     expect(await runCli(['check', '--contract', contract, '--evidence', evidence], io)).toBe(1);
@@ -83,6 +83,31 @@ describe('CLI', () => {
     expect(await runCli(['wat'], io)).toBe(2);
     expect(await runCli(['mcp', '--contract', 'custom.toml'], io)).toBe(0);
     expect(startMcp).toHaveBeenCalledWith(expect.stringContaining('custom.toml'));
+  });
+
+  it('scans directories, ignores generated/test files, and fails an empty scan', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'assay-design-scan-'));
+    const directory = join(root, '.design');
+    const contract = join(directory, 'contract.toml');
+    await runCli(['init', '--dir', directory], io);
+    const sources = join(root, 'src');
+    const nested = join(sources, 'nested');
+    const ignored = join(sources, 'node_modules');
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(nested, { recursive: true });
+    await mkdir(ignored, { recursive: true });
+    await writeFile(join(nested, 'card.css'), '.card { padding: 8px }');
+    await writeFile(join(nested, 'card.test.tsx'), 'className="p-[7px]"');
+    await writeFile(join(ignored, 'bad.tsx'), 'className="p-[7px]"');
+    await writeFile(join(sources, 'notes.txt'), 'not a style source');
+    output = [];
+    expect(await runCli(['audit', '--contract', contract, '--source', sources], io)).toBe(0);
+    expect(JSON.parse(output[0]!).coverage).toMatchObject({ status: 'complete', observations: 1 });
+    const empty = join(root, 'empty');
+    await mkdir(empty);
+    output = [];
+    expect(await runCli(['audit', '--contract', contract, '--source', empty], io)).toBe(1);
+    expect(JSON.parse(output[0]!).coverage.status).toBe('empty');
   });
 
   it('uses the process console and maps thrown errors to an exit code', async () => {

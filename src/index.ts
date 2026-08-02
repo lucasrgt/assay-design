@@ -10,9 +10,13 @@ export interface SurfaceContract { name: string; template?: string; requiredComp
 export interface DesignContract {
   schema: 1; name: string; extends: string[]; tokenFiles: string[]; components: ComponentContract[]; surfaces: SurfaceContract[];
   icons: Record<string, string[]>; policies: { maxPrimaryActionsPerRegion: number; buttonLabelPattern?: string; maxHeadingJump: number; requireIconIntent: boolean };
-  links: Record<string, string[]>; scales: Record<string, string[]>; tokens?: Record<string, string>;
+  links: Record<string, string[]>; scales: Record<string, string[]>; extensionPoints: string[]; tokens?: Record<string, string>;
 }
-export interface StyleDeclaration { origin: string; property: string; value: string; unresolved?: string[] }
+/** One lossy, ephemeral fact emitted by an adapter for linting. It is not a UI model or codegen input. */
+export interface StyleDeclaration {
+  origin: string; property: string; value: string; unresolved?: string[];
+  subject?: string; context?: string; tokenCandidates?: string[];
+}
 export interface EvidenceNode {
   component: string; variant?: string; state?: string; role?: string; action?: string; icon?: string; iconIntent?: string;
   text?: string; region?: string; headingLevel?: number; tokens?: string[]; slots?: string[]; parent?: number;
@@ -21,7 +25,7 @@ export interface DesignEvidence {
   surface: string; source?: string; nodes: EvidenceNode[]; tokens?: string[]; styles?: StyleDeclaration[];
   coverage?: { states?: string[]; themes?: string[]; viewports?: string[]; locales?: string[] };
 }
-export interface Finding { category: FindingCategory; path: string; message: string }
+export interface Finding { rule: string; category: FindingCategory; path: string; message: string }
 
 const record = (value: unknown, label: string): Dict => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a table`);
@@ -42,6 +46,9 @@ const defaultScales: Record<string, string[]> = {
   space: ['padding', 'margin', 'gap', 'inset', 'top', 'right', 'bottom', 'left'], radius: ['border-radius'], fontSize: ['font-size'],
   motion: ['transition', 'transition-duration', 'animation-duration'], color: ['color', 'background', 'border', 'outline', 'fill', 'stroke'],
 };
+type ContractDeclarations = { policies: string[]; scales: string[] };
+const contractDeclarations = new WeakMap<DesignContract, ContractDeclarations>();
+const declarationsOf = (contract: DesignContract): ContractDeclarations => contractDeclarations.get(contract) ?? { policies: Object.keys(contract.policies), scales: Object.keys(contract.scales) };
 
 export function parseContract(source: string): DesignContract {
   const raw = record(parse(source), 'contract');
@@ -75,10 +82,18 @@ export function parseContract(source: string): DesignContract {
   const buttonLabelPattern = optionalText(policies.button_label_pattern, 'policies.button_label_pattern');
   const scales = raw.scales === undefined ? defaultScales : Object.fromEntries(Object.entries(record(raw.scales, 'scales')).map(([group, value]) => [group, strings(value, `scales.${group}`)]));
   const extendsFrom = raw.extends === undefined ? [] : typeof raw.extends === 'string' ? [text(raw.extends, 'extends')] : strings(raw.extends, 'extends');
+  const inheritance = raw.inheritance === undefined ? {} : record(raw.inheritance, 'inheritance');
+  const declaredPolicies = [
+    ['max_primary_actions_per_region', 'maxPrimaryActionsPerRegion'],
+    ['button_label_pattern', 'buttonLabelPattern'],
+    ['max_heading_jump', 'maxHeadingJump'],
+    ['require_icon_intent', 'requireIconIntent'],
+  ].filter(([source]) => source! in policies).map(([, target]) => target!);
   const contract: DesignContract = {
-    schema: 1, name: text(raw.name, 'name'), extends: extendsFrom, tokenFiles: strings(raw.token_files, 'token_files'), components, surfaces, icons, links, scales,
+    schema: 1, name: text(raw.name, 'name'), extends: extendsFrom, tokenFiles: strings(raw.token_files, 'token_files'), components, surfaces, icons, links, scales, extensionPoints: strings(inheritance.extension_points, 'inheritance.extension_points'),
     policies: { maxPrimaryActionsPerRegion, maxHeadingJump, requireIconIntent: policies.require_icon_intent !== false, ...(buttonLabelPattern ? { buttonLabelPattern } : {}) },
   };
+  contractDeclarations.set(contract, { policies: declaredPolicies, scales: raw.scales === undefined ? [] : Object.keys(scales) });
   if (!extendsFrom.length) assertComposition(contract);
   return contract;
 }
@@ -116,9 +131,34 @@ const byName = <T extends { name: string }>(base: readonly T[], overlay: readonl
   return [...map.values()];
 };
 
-/** Overlay wins on name collisions. Org language is the base; the app contract is the overlay. */
-export function mergeContracts(base: DesignContract, overlay: DesignContract): DesignContract {
-  return {
+const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+const pick = <T extends Record<string, unknown>>(source: T, keys: readonly string[]) => Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]));
+const guardOverrides = (base: DesignContract, overlay: DesignContract, explicitOnly: boolean) => {
+  const allowed = new Set(base.extensionPoints);
+  const reject = (key: string) => { if (!allowed.has(key)) throw new Error(`local contract cannot override sealed ${key}; declare it in the base inheritance.extension_points`); };
+  const compareNamed = <T extends { name: string }>(kind: string, inherited: readonly T[], local: readonly T[]) => {
+    const localByName = new Map(local.map((item) => [item.name, item]));
+    for (const item of inherited) { const candidate = localByName.get(item.name); if (candidate && !same(item, candidate)) reject(`${kind}:${item.name}`); }
+  };
+  compareNamed('component', base.components, overlay.components);
+  compareNamed('surface', base.surfaces, overlay.surfaces);
+  for (const [name, value] of Object.entries(overlay.icons)) if (name in base.icons && !same(base.icons[name], value)) reject(`icon:${name}`);
+  const declarations = declarationsOf(overlay);
+  const policies = explicitOnly ? pick(overlay.policies, declarations.policies) : overlay.policies;
+  const scales = explicitOnly ? pick(overlay.scales, declarations.scales) : overlay.scales;
+  for (const [name, value] of Object.entries(policies)) if (name in base.policies && !same(base.policies[name as keyof DesignContract['policies']], value)) reject(`policy:${name}`);
+  for (const [name, value] of Object.entries(scales)) if (name in base.scales && !same(base.scales[name], value)) reject(`scale:${name}`);
+  for (const [name, value] of Object.entries(overlay.tokens ?? {})) if (base.tokens && name in base.tokens && base.tokens[name] !== value) reject(`token:${name}`);
+};
+
+/** Merge an app into its org language. Inherited definitions stay sealed unless explicitly extensible. */
+export function mergeContracts(base: DesignContract, overlay: DesignContract, explicitOnly = false): DesignContract {
+  guardOverrides(base, overlay, explicitOnly);
+  const baseDeclarations = declarationsOf(base);
+  const overlayDeclarations = declarationsOf(overlay);
+  const policies = explicitOnly ? pick(overlay.policies, overlayDeclarations.policies) : overlay.policies;
+  const scales = explicitOnly ? pick(overlay.scales, overlayDeclarations.scales) : overlay.scales;
+  const merged: DesignContract = {
     schema: 1,
     name: overlay.name,
     extends: overlay.extends,
@@ -126,22 +166,22 @@ export function mergeContracts(base: DesignContract, overlay: DesignContract): D
     components: byName(base.components, overlay.components),
     surfaces: byName(base.surfaces, overlay.surfaces),
     icons: { ...base.icons, ...overlay.icons },
-    policies: { ...base.policies, ...overlay.policies },
+    policies: { ...base.policies, ...policies } as DesignContract['policies'],
     links: Object.fromEntries([...new Set([...Object.keys(base.links), ...Object.keys(overlay.links)])].map((key) => [key, [...new Set([...(base.links[key] ?? []), ...(overlay.links[key] ?? [])])]])),
-    scales: { ...base.scales, ...overlay.scales },
+    scales: { ...base.scales, ...scales } as Record<string, string[]>,
+    extensionPoints: [...new Set([...base.extensionPoints, ...overlay.extensionPoints])],
     tokens: { ...base.tokens, ...overlay.tokens },
   };
+  contractDeclarations.set(merged, {
+    policies: [...new Set([...baseDeclarations.policies, ...overlayDeclarations.policies])],
+    scales: [...new Set([...baseDeclarations.scales, ...overlayDeclarations.scales])],
+  });
+  return merged;
 }
 
 export function inspectStyles(contract: DesignContract, declarations: readonly StyleDeclaration[]): Finding[] {
   if (!declarations.length) return [];
-  const findings: Finding[] = [];
-  for (const declaration of declarations) {
-    const path = `${declaration.origin} { ${declaration.property} }`;
-    for (const name of declaration.unresolved ?? []) findings.push({ category: 'tokens', path, message: `Reference "${name}" resolves to no value in the design language` });
-  }
-  findings.push(...auditPopulation(contract, declarations).findings);
-  return findings;
+  return auditPopulation(contract, declarations).findings;
 }
 
 export function collectStylesheet(sheets: string | Record<string, string>): StyleDeclaration[] {
@@ -154,7 +194,8 @@ export function collectStylesheet(sheets: string | Record<string, string>): Styl
       const unresolved: string[] = [];
       let value = raw.trim();
       for (let depth = 0; depth < 8 && value.includes('var('); depth += 1) value = value.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*))?\)/g, (_, name: string, fallback: string | undefined) => bindings.get(name) ?? (fallback?.trim() || (unresolved.push(name), 'unresolved')));
-      declarations.push({ origin: `${source} ${selector.trim().replace(/\s+/g, ' ')}`, property, value, ...(unresolved.length ? { unresolved } : {}) });
+      const subject = selector.trim().replace(/\s+/g, ' ');
+      declarations.push({ origin: `${source} ${subject}`, subject, property, value, ...(unresolved.length ? { unresolved } : {}) });
     }
   }
   return declarations;
@@ -164,56 +205,57 @@ const missing = (actual: readonly string[] | undefined, required: readonly strin
 export function inspectEvidence(contract: DesignContract, evidence: DesignEvidence): Finding[] {
   const findings: Finding[] = [];
   const components = new Map(contract.components.map((component) => [component.name, component]));
-  const add = (category: FindingCategory, path: string, message: string) => findings.push({ category, path, message });
+  const add = (rule: string, category: FindingCategory, path: string, message: string) => findings.push({ rule, category, path, message });
+  if (!evidence.nodes.length) add('coverage/no-component-observations', 'coverage', 'nodes', 'No component observations were supplied for this surface');
   evidence.nodes.forEach((node, index) => {
     const path = `nodes[${index}]`;
     const spec = components.get(node.component);
-    if (!spec) return add('components', path, `Use a declared component instead of "${node.component}"`);
+    if (!spec) return add('atomic/unknown-component', 'components', path, `Use a declared component instead of "${node.component}"`);
     if (node.parent !== undefined) {
-      if (!Number.isInteger(node.parent) || node.parent < 0 || node.parent >= evidence.nodes.length || node.parent === index) add('composition', `${path}.parent`, `Parent index "${node.parent}" is invalid`);
+      if (!Number.isInteger(node.parent) || node.parent < 0 || node.parent >= evidence.nodes.length || node.parent === index) add('atomic/invalid-parent', 'composition', `${path}.parent`, `Parent index "${node.parent}" is invalid`);
       else {
         const parent = components.get(evidence.nodes[node.parent]!.component);
-        if (parent && (parent.tier === 'atom' || tiers.indexOf(spec.tier) > tiers.indexOf(parent.tier))) add('composition', `${path}.parent`, `${parent.tier} "${parent.name}" cannot contain ${spec.tier} "${spec.name}"`);
-        else if (parent?.parts.length && !parent.parts.includes(spec.name)) add('composition', `${path}.parent`, `${parent.name} does not declare "${spec.name}" as a part`);
+        if (parent && (parent.tier === 'atom' || tiers.indexOf(spec.tier) > tiers.indexOf(parent.tier))) add('atomic/illegal-tier-nesting', 'composition', `${path}.parent`, `${parent.tier} "${parent.name}" cannot contain ${spec.tier} "${spec.name}"`);
+        else if (parent?.parts.length && !parent.parts.includes(spec.name)) add('atomic/undeclared-part', 'composition', `${path}.parent`, `${parent.name} does not declare "${spec.name}" as a part`);
       }
     }
     for (const [property, value, allowed] of [['variant', node.variant, spec.variants], ['state', node.state, spec.states], ['role', node.role, spec.roles]] as const) {
-      if (value && !allowed.includes(value)) add('properties', `${path}.${property}`, `"${value}" is outside ${node.component}.${property}s`);
+      if (value && !allowed.includes(value)) add(`component/undeclared-${property}`, 'properties', `${path}.${property}`, `"${value}" is outside ${node.component}.${property}s`);
     }
-    for (const slot of missing(node.slots, spec.requiredSlots)) add('composition', path, `${node.component} requires slot "${slot}"`);
+    for (const slot of missing(node.slots, spec.requiredSlots)) add('atomic/missing-slot', 'composition', path, `${node.component} requires slot "${slot}"`);
     if (node.icon) {
-      if (contract.policies.requireIconIntent && !node.iconIntent) add('semantics', path, `Icon "${node.icon}" needs an intent`);
-      else if (node.iconIntent && !contract.icons[node.iconIntent]?.includes(node.icon)) add('semantics', path, `Icon "${node.icon}" does not express intent "${node.iconIntent}"`);
+      if (contract.policies.requireIconIntent && !node.iconIntent) add('semantics/missing-icon-intent', 'semantics', path, `Icon "${node.icon}" needs an intent`);
+      else if (node.iconIntent && !contract.icons[node.iconIntent]?.includes(node.icon)) add('semantics/icon-intent-mismatch', 'semantics', path, `Icon "${node.icon}" does not express intent "${node.iconIntent}"`);
     }
-    if (contract.policies.buttonLabelPattern && node.component === 'button' && node.text && !new RegExp(contract.policies.buttonLabelPattern, 'u').test(node.text)) add('semantics', `${path}.text`, `Button label "${node.text}" violates the content pattern`);
-    for (const token of node.tokens ?? []) if (contract.tokens && !(token in contract.tokens)) add('coverage', `${path}.tokens`, `Token "${token}" is not in the DTCG sources`);
+    if (contract.policies.buttonLabelPattern && node.component === 'button' && node.text && !new RegExp(contract.policies.buttonLabelPattern, 'u').test(node.text)) add('content/button-label', 'semantics', `${path}.text`, `Button label "${node.text}" violates the content pattern`);
+    for (const token of node.tokens ?? []) if (contract.tokens && !(token in contract.tokens)) add('tokens/unknown-token', 'tokens', `${path}.tokens`, `Token "${token}" is not in the DTCG sources`);
   });
   const regions = Map.groupBy(evidence.nodes.filter((node) => node.action === 'primary'), (node) => node.region ?? 'page');
-  for (const [region, actions] of regions) if (actions.length > contract.policies.maxPrimaryActionsPerRegion) add('semantics', `region.${region}`, `${actions.length} primary actions exceed the limit of ${contract.policies.maxPrimaryActionsPerRegion}`);
+  for (const [region, actions] of regions) if (actions.length > contract.policies.maxPrimaryActionsPerRegion) add('hierarchy/primary-action-limit', 'semantics', `region.${region}`, `${actions.length} primary actions exceed the limit of ${contract.policies.maxPrimaryActionsPerRegion}`);
   let heading = 0;
   for (const [index, node] of evidence.nodes.entries()) if (node.headingLevel) {
-    if (heading && node.headingLevel - heading > contract.policies.maxHeadingJump) add('semantics', `nodes[${index}].headingLevel`, `Heading jumps from h${heading} to h${node.headingLevel}`);
+    if (heading && node.headingLevel - heading > contract.policies.maxHeadingJump) add('hierarchy/heading-jump', 'semantics', `nodes[${index}].headingLevel`, `Heading jumps from h${heading} to h${node.headingLevel}`);
     heading = node.headingLevel;
   }
   const surface = contract.surfaces.find((item) => item.name === evidence.surface);
-  for (const token of evidence.tokens ?? []) if (contract.tokens && !(token in contract.tokens)) add('coverage', 'tokens', `Token "${token}" is not in the DTCG sources`);
-  if (!surface) add('coverage', 'surface', `Surface "${evidence.surface}" is not declared`);
+  for (const token of evidence.tokens ?? []) if (contract.tokens && !(token in contract.tokens)) add('tokens/unknown-token', 'tokens', 'tokens', `Token "${token}" is not in the DTCG sources`);
+  if (!surface) add('coverage/unknown-surface', 'coverage', 'surface', `Surface "${evidence.surface}" is not declared`);
   else {
-    for (const component of missing(evidence.nodes.map((node) => node.component), [...new Set([...surface.requiredComponents, ...(surface.template ? [surface.template] : [])])])) add('coverage', 'surface', `Surface requires component "${component}"`);
-    for (const axis of ['states', 'themes', 'viewports', 'locales'] as const) for (const value of missing(evidence.coverage?.[axis], surface[axis])) add('coverage', `coverage.${axis}`, `Missing ${axis.slice(0, -1)} "${value}"`);
+    for (const component of missing(evidence.nodes.map((node) => node.component), [...new Set([...surface.requiredComponents, ...(surface.template ? [surface.template] : [])])])) add('coverage/missing-component', 'coverage', 'surface', `Surface requires component "${component}"`);
+    for (const axis of ['states', 'themes', 'viewports', 'locales'] as const) for (const value of missing(evidence.coverage?.[axis], surface[axis])) add('coverage/missing-axis', 'coverage', `coverage.${axis}`, `Missing ${axis.slice(0, -1)} "${value}"`);
   }
   findings.push(...inspectStyles(contract, evidence.styles ?? []));
   return findings;
 }
 
 type DesignExpect = { clear(category: FindingCategory): void };
-const designArchetype = archetype('design-system-conformance', '0.1.0', () => {
+const designArchetype = archetype('design-system-conformance', '0.2.0', () => {
   const check = (id: FindingCategory, statement: string) => criterion(`design.${id}`, statement, { substrate: 'static' }, mechanical<DesignExpect>(({ expect }) => expect.clear(id)));
   check('components', 'Every rendered component belongs to the design-system vocabulary');
   check('properties', 'Component variants, states, and roles are declared');
   check('composition', 'Atomic hierarchy, declared parts, and required slots are respected');
   check('semantics', 'Content, action hierarchy, headings, and icons follow policy');
-  check('coverage', 'Surfaces and tokens satisfy their declared coverage');
+  check('coverage', 'Surfaces and observation axes satisfy their declared coverage');
   check('tokens', 'Every styled value resolves to a token in the design language');
   check('scale', 'Effective values lie on the declared scale or are promoted into it');
   check('coherence', 'Equivalent components reuse the same values for the same properties');
