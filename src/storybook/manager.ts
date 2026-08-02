@@ -162,7 +162,7 @@ function VisualInspector({ payload, name }: { payload: DesignPanelPayload; name:
   return element('aside', { style: styles.inspector },
     element('div', { style: styles.componentMeta },
       element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
-      visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values]) => element('span', { key: label, style: styles.componentMetaGroup }, label, ...chips(values)))) : null,
+      visibleGroups.length ? element('span', { style: styles.componentMetaDetails }, ...visibleGroups.map(([label, values], index) => element('span', { key: label, style: { ...styles.componentMetaGroup, ...(index ? { paddingLeft: 14, borderLeft: '1px solid var(--ad-line)' } : {}) } }, label, ...chips(values)))) : null,
     ),
     element('div', { style: styles.previewFrame },
       story
