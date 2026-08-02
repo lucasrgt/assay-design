@@ -44,6 +44,7 @@ const styles = {
   inventoryDetail: { gridColumn: '2 / -1', color: 'inherit', opacity: .76, fontSize: 9, lineHeight: 1.35 },
   chip: { margin: '2px 3px 2px 0', fontFamily: 'var(--ad-mono)' },
   finding: { padding: '10px 12px', marginBottom: 6, border: '1px solid var(--ad-line)', borderLeft: '3px solid var(--ad-negative)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
+  tierBadge: { display: 'inline-flex', alignItems: 'center', justifySelf: 'end', gap: 5, padding: '3px 8px', border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-hover)', fontSize: 10, fontWeight: 600, textTransform: 'capitalize' as const },
   workspace: { display: 'grid', gridTemplateColumns: 'minmax(250px, 290px) minmax(0, 1fr)', gap: 16, alignItems: 'start' },
   inventory: { minWidth: 0, paddingRight: 12, borderRight: '1px solid var(--ad-line)' },
   inspector: { position: 'sticky' as const, top: 0, minWidth: 0 },
@@ -96,6 +97,13 @@ const componentIssues = (payload: DesignPanelPayload, name: string) => {
   return findingsOf(payload).filter((finding) => [...indexes].some((index) => finding.path === `nodes[${index}]` || finding.path.startsWith(`nodes[${index}].`)));
 };
 const chips = (values: readonly string[]) => values.length ? values.map((value) => element('span', { key: value, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, value))) : [element('span', { key: 'empty', style: styles.detail }, '—')];
+const tierBadge = (tier: (typeof tiers)[number]) => {
+  const TierIcon = tierIcons[tier];
+  return element('span', { style: styles.tierBadge },
+    element(TierIcon, { style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), color: tierColors[tier] } }),
+    element('span', null, tier),
+  );
+};
 
 function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayload; selected: string; onSelect(name: string): void }) {
   const [collapsed, setCollapsed] = React.useState<Record<(typeof tiers)[number], boolean>>({ atom: false, molecule: false, organism: false, template: false });
@@ -163,7 +171,7 @@ function Composition({ payload }: { payload: DesignPanelPayload }) {
     ...(parents.length ? parents.map((component) => element('div', { key: component.name, style: styles.row },
       element('span', { style: styles.name }, component.name),
       element('div', null, ...component.parts.map((part) => element('span', { key: part, style: styles.chip }, element(Badge, { compact: true, status: 'neutral' }, `→ ${part}`)))),
-      element(Badge, { compact: true, status: 'active' }, component.tier),
+      tierBadge(component.tier),
     )) : [element(EmptyTabContent, { key: 'empty', title: 'No component composition declared' })]),
   );
 }
