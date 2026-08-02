@@ -14,14 +14,13 @@ type Result = { criterionId?: string; status?: string; reason?: string; evidence
 const styles = {
   root: { minHeight: '100vh', width: '100%', padding: 20, color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, marginBottom: 14 },
-  eyebrow: { color: 'var(--ad-muted)', fontSize: 11, fontWeight: 600 },
-  title: { margin: '3px 0 2px', color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
-  meta: { color: 'var(--ad-muted)', font: '10px var(--ad-mono)' },
+  title: { margin: '0 0 3px', color: 'var(--ad-text)', fontSize: 17, fontWeight: 700 },
+  meta: { color: 'var(--ad-muted)', fontFamily: 'var(--ad-font)', fontSize: 11, lineHeight: 1.4 },
   tabs: { display: 'flex', gap: 2, marginBottom: 14, borderBottom: '1px solid var(--ad-line)' },
   section: { marginBottom: 13 },
   sectionTitle: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, color: 'var(--ad-muted)', fontSize: 10, fontWeight: 600 },
   row: { display: 'grid', gridTemplateColumns: 'minmax(150px, .7fr) minmax(180px, 1.2fr) 90px', gap: 12, alignItems: 'center', padding: '9px 11px', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)', marginBottom: 5 },
-  inventoryRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', minHeight: 34, padding: '6px 8px', borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
+  inventoryRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '5px 8px', alignItems: 'center', width: '100%', height: 'auto', minHeight: 34, padding: '6px 8px', overflow: 'visible', whiteSpace: 'normal' as const, borderRadius: 'var(--ad-radius)', color: 'var(--ad-text)', textAlign: 'left' as const },
   selectedRow: { background: 'var(--ad-hover)', boxShadow: 'inset 2px 0 var(--ad-accent)' },
   name: { color: 'var(--ad-text)', font: '600 11px var(--ad-mono)', overflow: 'hidden', textOverflow: 'ellipsis' },
   detail: { color: 'var(--ad-muted)', fontSize: 10, lineHeight: 1.4 },
@@ -71,12 +70,12 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
           element('span', { style: styles.name }, component.name),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
-          element('div', { style: styles.inventoryDetail },
+          selected === component.name ? element('div', { style: styles.inventoryDetail },
             component.parts.length ? element('div', null, 'parts ', ...chips(component.parts)) : null,
             component.variants.length ? element('div', null, 'variants ', ...chips(component.variants)) : null,
             component.states.length ? element('div', null, 'states ', ...chips(component.states)) : null,
             component.requiredSlots.length ? element('div', null, 'slots ', ...chips(component.requiredSlots)) : null,
-          ),
+          ) : null,
         );
       }) : [element(EmptyTabContent, { key: 'empty', title: `No ${tier}s declared` })]),
     );
@@ -153,10 +152,10 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
     : tab === 'composition' ? element(Composition, { payload }) : tab === 'coverage' ? element(Coverage, { payload }) : element(Violations, { payload });
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('header', { style: styles.header },
-      element('div', null, element('div', { style: styles.eyebrow }, 'Assay Design / live evidence'), element('div', { style: styles.title }, payload.contract.name), element('div', { style: styles.meta }, `${payload.contract.components.length} declared · ${observed} observed · ${Object.keys(payload.stories).length} stories · ${payload.evidence.surface}`)),
+      element('div', null, element('div', { style: styles.title }, payload.contract.name), element('div', { style: styles.meta }, `${payload.contract.components.length} declared · ${observed} observed · ${Object.keys(payload.stories).length} stories · ${payload.evidence.surface}`)),
       element(Badge, { status: passing ? 'positive' : 'negative' }, passing ? 'PASS' : 'FAIL'),
     ),
-    element('nav', { style: styles.tabs }, ...tabs.map(([id, label, count]) => element(TabButton, { key: id, active: tab === id, onClick: () => setTab(id), children: [label, ' ', element(Badge, { key: 'count', compact: true, status: id === 'violations' && count ? 'negative' : 'neutral' }, count)] }))),
+    element('nav', { style: styles.tabs }, ...tabs.map(([id, label, count]) => element(TabButton, { key: id, active: tab === id, onClick: () => setTab(id), style: { gap: 6 }, children: [label, element(Badge, { key: 'count', compact: true, status: id === 'violations' && count ? 'negative' : 'neutral' }, count)] }))),
     content,
   );
 }
