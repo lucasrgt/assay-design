@@ -1,5 +1,5 @@
 import React, { type CSSProperties } from 'react';
-import { ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, GridIcon, StructureIcon } from '@storybook/icons';
+import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, GridIcon, StructureIcon } from '@storybook/icons';
 import { Badge, Button, EmptyTabContent, Link, TabButton } from 'storybook/internal/components';
 import { addons, types, useChannel } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
@@ -97,7 +97,7 @@ function Inventory({ payload, selected, onSelect }: { payload: DesignPanelPayloa
         const status = issues ? `${issues} issue${issues === 1 ? '' : 's'}` : observed ? `${observed} observed` : 'not observed';
         const story = payload.stories[component.name];
         return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, active: selected === component.name, onClick: () => onSelect(component.name), style: { ...styles.inventoryRow, ...(selected === component.name ? styles.selectedRow : {}) } },
-          element(TierIcon, { style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), color: tierColors[tier] } }),
+          element(BookmarkHollowIcon, { style: { ...styles.treeIcon, color: 'var(--ad-accent)' } }),
           element('span', { style: styles.name }, component.name),
           element(Badge, { compact: true, status: issues || !story ? 'negative' : observed ? 'positive' : 'neutral' }, story ? status : 'story missing'),
           selected === component.name ? element('div', { style: styles.inventoryDetail },
