@@ -70,10 +70,11 @@ const themedToken = (name: string, theme: string | undefined, tokens: Record<str
   const themed = `${group}.${theme}.${rest.join('.')}`;
   return themed in tokens ? themed : name;
 };
-const bindingMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
-  governs([binding.property], declaration.property) && (['variant', 'appearance', 'state', 'role', 'slot'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
 const bindingContextMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
-  (['variant', 'appearance', 'state', 'role', 'slot'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
+  (binding.slot ? binding.slot === declaration.slot : !declaration.slot)
+  && (['variant', 'appearance', 'state', 'role'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
+const bindingMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
+  governs([binding.property], declaration.property) && bindingContextMatches(binding, declaration);
 const paths = (group: string, value: string) => {
   const parts = value.split('-');
   const names = [
