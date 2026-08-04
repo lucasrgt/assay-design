@@ -1,5 +1,5 @@
 import React, { type CSSProperties } from 'react';
-import { ArrowRightIcon, BrowserIcon, ComponentIcon, DocumentIcon, ExpandAltIcon, GridAltIcon, GridIcon, MoonIcon, SideBySideIcon, SunIcon } from '@storybook/icons';
+import { ArrowRightIcon, BrowserIcon, ComponentIcon, DocumentIcon, ExpandAltIcon, GridAltIcon, GridIcon, MobileIcon, MoonIcon, SideBySideIcon, SunIcon } from '@storybook/icons';
 import { Badge, Button, EmptyTabContent, IconButton, TabButton } from 'storybook/internal/components';
 import { addons, types, useAddonState, useChannel, useGlobals, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { type StorybookTheme, useTheme } from 'storybook/theming';
@@ -19,6 +19,8 @@ const scrollbarCss = `.assay-scrollbar{scrollbar-width:thin;scrollbar-color:colo
 type Tab = 'inventory' | 'coverage' | 'violations';
 type Finding = { rule: string; category: string; path: string; message: string };
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
+type PreviewViewport = 'desktop' | 'mobile';
+const mobileViewport = { label: 'iPhone 15', width: 393, height: 852 } as const;
 
 const styles = {
   root: { display: 'flex', flexDirection: 'column' as const, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box' as const, padding: '0 20px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
@@ -49,6 +51,8 @@ const styles = {
   componentMeta: { display: 'flex', flex: '0 0 auto', flexDirection: 'column' as const, alignItems: 'flex-start', gap: 7, minHeight: 45, padding: '8px 12px 9px', borderBottom: '1px solid var(--ad-line)', background: 'var(--ad-canvas)' },
   componentMetaHeading: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' },
   componentMetaActions: { display: 'inline-flex', alignItems: 'center', gap: 7 },
+  viewportSwitch: { display: 'inline-flex', alignItems: 'center', gap: 2, padding: 2, border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
+  viewportOption: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 28, height: 22, padding: '0 6px', border: 0, borderRadius: 'calc(var(--ad-radius) - 2px)', color: 'var(--ad-muted)', background: 'transparent', font: '600 10px var(--ad-font)', cursor: 'pointer' },
   advancedControl: { display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ad-muted)', fontSize: 10, fontWeight: 600 },
   advancedSwitch: { position: 'relative' as const, width: 28, height: 16, padding: 0, border: '1px solid var(--ad-line)', borderRadius: 999, background: 'var(--ad-panel)', cursor: 'pointer' },
   advancedSwitchKnob: { position: 'absolute' as const, top: 2, left: 2, width: 10, height: 10, borderRadius: '50%', background: 'var(--ad-muted)', transition: 'transform 120ms ease, background 120ms ease' },
@@ -63,6 +67,8 @@ const styles = {
   componentMetaChip: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, marginRight: 3, padding: '4px 7px', borderRadius: 20, fontFamily: 'var(--ad-font)', fontSize: 10, fontWeight: 600, lineHeight: '12px', letterSpacing: 0 },
   previewFrame: { position: 'relative' as const, display: 'flex', flex: '1 1 0', minHeight: 0, overflow: 'hidden' },
   preview: { display: 'block', flex: '1 1 auto', width: '100%', height: '100%', minHeight: 0, border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
+  mobileCanvas: { alignItems: 'flex-start', justifyContent: 'center', padding: 12, overflow: 'auto', background: 'var(--ad-canvas)', boxSizing: 'border-box' as const },
+  mobileFrame: { display: 'block', flex: '0 0 auto', width: mobileViewport.width, height: mobileViewport.height, minHeight: mobileViewport.height, maxWidth: '100%', border: '1px solid var(--ad-line)', background: 'var(--ad-panel)' },
   previewGallery: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', alignContent: 'start', gap: 10, width: '100%', height: '100%', minHeight: 0, padding: 10, boxSizing: 'border-box' as const, overflowY: 'auto' as const, overscrollBehavior: 'contain' as const, background: 'var(--ad-canvas)' },
   previewCard: { display: 'flex', flexDirection: 'column' as const, alignSelf: 'start', minWidth: 0, minHeight: 0, height: 'max-content', overflow: 'hidden', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   previewCardHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 32, padding: '5px 8px', borderBottom: '1px solid var(--ad-line)', color: 'var(--ad-text)', fontSize: 11, fontWeight: 600 },
@@ -149,6 +155,14 @@ const tierBadge = (tier: Tier, compact = false) => {
   );
 };
 
+function ViewportSwitch({ value, onChange }: { value: PreviewViewport; onChange(value: PreviewViewport): void }) {
+  const options = [['desktop', BrowserIcon, 'Desktop'], ['mobile', MobileIcon, 'Mobile']] as const;
+  return element('span', { role: 'group', 'aria-label': 'Preview viewport', style: styles.viewportSwitch }, ...options.map(([id, Icon, label]) => {
+    const active = value === id;
+    return element('button', { key: id, type: 'button', title: id === 'mobile' ? `${label} · ${mobileViewport.label} ${mobileViewport.width} × ${mobileViewport.height}` : label, 'aria-pressed': active, onClick: () => onChange(id), style: { ...styles.viewportOption, ...(active ? { color: 'var(--ad-selected-text)', background: 'var(--ad-accent)' } : {}) } }, element(Icon, { style: { width: 12, height: 12 } }), element('span', null, label));
+  }));
+}
+
 function InspectionFacts({ facts, compact = false }: { facts: AdvancedInspection[] | undefined; compact?: boolean }) {
   const fact = facts?.[0];
   if (!fact) return element('div', { className: compact ? undefined : 'assay-scrollbar', style: compact ? styles.cardFactsPanel : styles.factsPanel }, element('span', { style: styles.detail }, 'Waiting for rendered evidence…'));
@@ -178,10 +192,12 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   const dark = globals.theme === 'dark';
   const [selections, setSelections] = React.useState<Record<string, Record<string, string>>>({});
   const [comparisonModes, setComparisonModes] = React.useState<Record<string, string>>({});
+  const [viewport, setViewport] = React.useState<PreviewViewport>('desktop');
   const [advanced, setAdvanced] = React.useState(false);
   const [inspections, setInspections] = React.useState<Record<string, AdvancedInspection[]>>({});
   const inspectorRef = React.useRef<HTMLElement>(null);
   const theme = useTheme() as StorybookTheme;
+  const mobile = viewport === 'mobile';
   const inspectionPalette = { accent: theme.fgColor.accent, agentic: theme.fgColor.agentic, positive: theme.fgColor.positive, warning: theme.fgColor.warning, panel: theme.background.app, text: theme.fgColor.default, muted: theme.fgColor.muted };
   const syncFrame = (frame: HTMLIFrameElement) => {
     const key = frame.dataset.inspectionKey ?? '$single';
@@ -203,9 +219,9 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
     return element('aside', { ref: inspectorRef, style: styles.inspector },
       element('div', { style: styles.componentMeta }, element('span', { style: styles.componentMetaHeading },
         element('span', { style: styles.componentIdentity }, element('span', { style: styles.tierBadge }, element(BrowserIcon, { style: { ...styles.treeIcon, color: 'var(--ad-story)' } }), 'Page'), element('span', { style: styles.componentMetaTitle }, pageLabel)),
-        element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: dark, ariaLabel: dark ? 'Use light mode' : 'Use dark mode', title: dark ? 'Use light mode' : 'Use dark mode', onClick: () => updateGlobals({ theme: dark ? 'light' : 'dark' }), style: styles.comparisonAction }, dark ? element(SunIcon) : element(MoonIcon)),
+        element('span', { style: styles.componentMetaActions }, element(ViewportSwitch, { value: viewport, onChange: setViewport }), element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: dark, ariaLabel: dark ? 'Use light mode' : 'Use dark mode', title: dark ? 'Use light mode' : 'Use dark mode', onClick: () => updateGlobals({ theme: dark ? 'light' : 'dark' }), style: styles.comparisonAction }, dark ? element(SunIcon) : element(MoonIcon))),
       )),
-      story ? element('iframe', { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}`, scrolling: 'auto', style: styles.preview }) : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No page story mapped' })),
+      story ? element('div', { style: { ...styles.previewFrame, ...(mobile ? styles.mobileCanvas : {}) } }, element('iframe', { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}`, scrolling: 'auto', style: mobile ? styles.mobileFrame : styles.preview })) : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No page story mapped' })),
     );
   }
   const component = payload.contract.components.find((item) => item.name === name);
@@ -254,6 +270,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
       element('span', { style: styles.componentMetaHeading },
         element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
         element('span', { style: styles.componentMetaActions },
+          element(ViewportSwitch, { value: viewport, onChange: setViewport }),
           element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: dark, ariaLabel: dark ? 'Use light mode' : 'Use dark mode', title: dark ? 'Use light mode' : 'Use dark mode', onClick: () => updateGlobals({ theme: dark ? 'light' : 'dark' }), style: styles.comparisonAction }, dark ? element(SunIcon) : element(MoonIcon)),
           element('span', { style: styles.advancedControl }, element('span', null, 'Advanced'), element('button', { type: 'button', role: 'switch', 'aria-checked': advanced, title: advanced ? 'Disable advanced inspection' : 'Enable advanced inspection', onClick: () => setAdvanced((value) => !value), style: { ...styles.advancedSwitch, ...(advanced ? { background: 'var(--ad-accent)', borderColor: 'var(--ad-accent)' } : {}) } }, element('span', { style: { ...styles.advancedSwitchKnob, ...(advanced ? { background: 'var(--ad-selected-text)', transform: 'translateX(12px)' } : {}) } }))),
           hasOverview ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: mode === '$all', ariaLabel: mode === '$all' ? 'Return to single preview' : 'Show all comparisons', title: mode === '$all' ? 'Single preview' : 'Show all comparisons', onClick: () => toggleMode('$all'), style: styles.comparisonAction }, element(GridAltIcon)) : null,
@@ -276,23 +293,23 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
         );
       })) : null,
     ),
-    element('div', { style: styles.previewFrame },
+    element('div', { style: { ...styles.previewFrame, ...(!comparisonFrames.length && currentPreview.story && !advanced && mobile ? styles.mobileCanvas : {}) } },
       comparisonFrames.length
-        ? element('div', { className: 'assay-scrollbar', style: styles.previewGallery }, ...comparisonFrames.map((frame) => element('article', { key: frame.key, style: styles.previewCard },
+        ? element('div', { className: 'assay-scrollbar', style: { ...styles.previewGallery, ...(mobile ? { gridTemplateColumns: `repeat(auto-fit, ${mobileViewport.width}px)`, justifyContent: 'center' } : {}) } }, ...comparisonFrames.map((frame) => element('article', { key: frame.key, style: { ...styles.previewCard, ...(mobile ? { width: mobileViewport.width } : {}) } },
           element('header', { style: styles.previewCardHeader }, element('span', null, frame.label), frame.story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true }, element('a', { href: `?path=/story/${encodeURIComponent(frame.story)}${frame.query ? `&args=${encodeURIComponent(frame.query)}` : ''}${frame.globals ? `&globals=${encodeURIComponent(frame.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null),
-          frame.source ? element('iframe', { title: `${component.name} ${frame.label}`, src: frame.source, loading: 'lazy', scrolling: 'auto', 'data-inspection-key': frame.key, onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.previewCardFrame }) : null,
+          frame.source ? element('iframe', { title: `${component.name} ${frame.label}`, src: frame.source, loading: 'lazy', scrolling: 'auto', 'data-inspection-key': frame.key, onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: mobile ? { ...styles.previewCardFrame, flexBasis: mobileViewport.height, height: mobileViewport.height } : styles.previewCardFrame }) : null,
           advanced ? element(InspectionFacts, { facts: inspections[frame.key], compact: true }) : null,
         )))
         : currentPreview.story
           ? advanced
             ? element('div', { style: styles.advancedPreview },
-              element('div', { style: styles.advancedCanvas },
-                element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.preview }),
+              element('div', { style: { ...styles.advancedCanvas, ...(mobile ? styles.mobileCanvas : {}) } },
+                element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: mobile ? styles.mobileFrame : styles.preview }),
                 element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(currentPreview.story)}${currentPreview.query ? `&args=${encodeURIComponent(currentPreview.query)}` : ''}${currentPreview.globals ? `&globals=${encodeURIComponent(currentPreview.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))),
               ),
               element(InspectionFacts, { facts: inspections.$single }),
             )
-            : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.preview })
+            : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: mobile ? styles.mobileFrame : styles.preview })
         : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' })),
       !comparisonFrames.length && currentPreview.story && !advanced ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(currentPreview.story)}${currentPreview.query ? `&args=${encodeURIComponent(currentPreview.query)}` : ''}${currentPreview.globals ? `&globals=${encodeURIComponent(currentPreview.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
