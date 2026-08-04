@@ -339,7 +339,12 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
       const rows: [string, string][] = [];
       if (directText || slot || component === 'text' || component === 'icon') rows.push(['color', computed.color]);
       if (computed.backgroundColor && !['transparent', 'rgba(0, 0, 0, 0)'].includes(computed.backgroundColor)) rows.push(['background-color', computed.backgroundColor]);
-      const borderColors = [...new Set((['top', 'right', 'bottom', 'left'] as const).flatMap((edge) => Number.parseFloat(computed.getPropertyValue(`border-${edge}-width`)) > 0 ? [computed.getPropertyValue(`border-${edge}-color`)] : []).filter((color) => color && !['transparent', 'rgba(0, 0, 0, 0)'].includes(color)))];
+      const borderColors = [...new Set((['top', 'right', 'bottom', 'left'] as const).flatMap((edge) => {
+        const style = computed.getPropertyValue(`border-${edge}-style`);
+        return !['', 'none', 'hidden'].includes(style) && Number.parseFloat(computed.getPropertyValue(`border-${edge}-width`)) > 0
+          ? [computed.getPropertyValue(`border-${edge}-color`)]
+          : [];
+      }).filter((color) => color && !['transparent', 'rgba(0, 0, 0, 0)'].includes(color)))];
       if (borderColors.length === 1) rows.push(['border-color', borderColors[0]!]);
       else borderColors.forEach((color, edge) => rows.push([`border-${edge}-color`, color]));
       for (const property of ['min-height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'] as const) rows.push([property, computed.getPropertyValue(property)]);

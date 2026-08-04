@@ -159,6 +159,12 @@ describe('evidence', () => {
     expect(inspectEvidence(palette, rendered).some((finding) => finding.rule === 'tokens/unbound-color')).toBe(false);
   });
 
+  it('ignores computed border colors when no border is rendered', () => {
+    document.body.innerHTML = '<main data-ui="screen"><div data-ui="stack"></div></main>';
+    const rendered = collectDocument(document, 'dashboard');
+    expect(rendered.styles?.filter((item) => item.property.includes('border') && item.property.includes('color')) ?? []).toEqual([]);
+  });
+
   it('owns slots locally and applies theme-aware semantic color bindings', () => {
     const bound = contract();
     bound.tokens = { ...bound.tokens, 'color.dark.content.primary': '#f8fafb', 'color.dark.content.onAction': '#000', 'color.dark.action.primary': '#3fc4e1' };
