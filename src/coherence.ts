@@ -72,6 +72,8 @@ const themedToken = (name: string, theme: string | undefined, tokens: Record<str
 };
 const bindingMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
   governs([binding.property], declaration.property) && (['variant', 'appearance', 'state', 'role', 'slot'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
+const bindingContextMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
+  (['variant', 'appearance', 'state', 'role', 'slot'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
 const paths = (group: string, value: string) => {
   const parts = value.split('-');
   const names = [
@@ -185,6 +187,15 @@ export function auditPopulation(contract: DesignContract, declarations: readonly
       const observed = styleKey(declaration.property, declaration.value);
       const allowed = candidates.flatMap((name) => tokens[name] ? [styleKey(declaration.property, tokens[name]!)] : []);
       if (candidates.length && observed && !allowed.includes(observed)) tokenFinding({ rule: 'tokens/semantic-style-mismatch', category: 'tokens', path, message: `Computed ${declaration.property} "${declaration.value}" must use ${candidates.join(' or ')}` });
+    }
+  }
+  const renderedGroups = Map.groupBy(declarations.filter((item) => item.component), (item) => `${item.origin}\0${item.component}\0${item.variant ?? ''}\0${item.appearance ?? ''}\0${item.state ?? ''}\0${item.role ?? ''}\0${item.slot ?? ''}`);
+  for (const group of renderedGroups.values()) {
+    const sample = group[0]!;
+    const component = contract.components.find((item) => item.name === sample.component);
+    for (const binding of component?.styleBindings.filter((item) => bindingContextMatches(item, sample)) ?? []) {
+      if (group.some((declaration) => governs([binding.property], declaration.property))) continue;
+      tokenFinding({ rule: 'tokens/missing-semantic-style', category: 'tokens', path: `${sample.origin} { ${binding.property} }`, message: `Rendered ${sample.component}${sample.slot ? ` slot "${sample.slot}"` : ''} exposes no ${binding.property} value required by ${binding.tokens.join(' or ')}` });
     }
   }
   if (!declarations.length || !tokens) return { census: [], findings: [...coverageFindings, ...tokenFindings], systematicThreshold, coverage };

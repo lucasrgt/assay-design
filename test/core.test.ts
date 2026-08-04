@@ -223,6 +223,10 @@ describe('evidence', () => {
 
     document.querySelector('button')!.setAttribute('style', 'min-height:56px;border-radius:12px;box-shadow:0 6px 16px rgba(16,24,40,.08)');
     expect(inspectEvidence(bound, collectDocument(document, 'dashboard')).some((finding) => finding.rule === 'tokens/semantic-style-mismatch')).toBe(false);
+    document.querySelector('button')!.setAttribute('style', 'min-height:56px;border-radius:12px');
+    expect(inspectEvidence(bound, collectDocument(document, 'dashboard'))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'tokens/missing-semantic-style', message: expect.stringContaining('box-shadow') }),
+    ]));
   });
 });
 
