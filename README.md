@@ -111,7 +111,7 @@ The report has two layers:
 | Census `oneOff` | A rare escape from the scale | Fails `design.scale` |
 | Coherence findings | The same component family uses multiple values for one property | Fails `design.coherence` |
 
-`--source` accepts files or directories, ignores tests/build outputs, and extracts named or arbitrary Tailwind utilities plus React Native style literals as lint observations. CSS continues to enter through `--styles`. Every audit reports observation coverage; an empty scan or a fleet member without comparable component subjects fails closed instead of receiving a zero-drift score.
+`--source` accepts files or directories, ignores tests/build outputs, and extracts named or arbitrary Tailwind utilities plus React Native style literals as lint observations. Raw color literals fail even when their numeric value happens to equal a token. CSS continues to enter through `--styles`; rendered DOM evidence additionally observes computed color, minimum height, padding, radius, shadow, and text metrics. Component `style_bindings` can therefore reject a rendered recipe whose geometry or elevation diverges even when it uses a canonical component. Every audit reports observation coverage; an empty scan or a fleet member without comparable component subjects fails closed instead of receiving a zero-drift score.
 
 Findings use stable rule IDs such as `atomic/illegal-tier-nesting`, `tokens/unresolved-reference`, `tokens/off-scale-one-off`, `coherence/property-drift`, and `coverage/no-comparable-subjects`. Adapters only report observations; these rules and their severity belong to the harness core.
 
@@ -151,12 +151,16 @@ const verdict = await verifyEvidence(
 
 ## Storybook
 
-Install the optional `storybook-addon-pseudo-states` peer and add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the full-page Design Contract tab renders the AVP result. An optional `stories` map connects contract component names to canonical Storybook story IDs, producing a selectable Atomic inventory with the real implementation rendered in a live inspector.
+Install the optional `storybook-addon-pseudo-states` peer and add `assay-design/storybook` to `addons`. Supply the compiled contract and surface through story parameters; the full-page Design Contract tab renders the AVP result. An optional `stories` map connects reusable component names to canonical Storybook story IDs. A separate `pages` map connects product surfaces to their full-page stories, keeping pages outside the reusable Atomic tiers.
 
-Compile or import contracts inside Storybook preview code through `assay-design/browser`. The main entrypoint also exposes filesystem-backed CLI helpers and is intentionally Node-only.
+Compile or import contracts inside Storybook preview code through `assay-design/browser`. Pass imported DTCG documents as the second argument so the Atomic View can project typed foundations (color, typography, spacing, radii, shadows, motion, and other declared groups). `$type` is inherited from DTCG groups; the addon does not guess token categories from their names. The main entrypoint also exposes filesystem-backed CLI helpers and is intentionally Node-only.
 
 ```ts
 import { parseContract } from 'assay-design/browser';
+import contractSource from './contract.toml?raw';
+import tokenDocument from './tokens.tokens.json';
+
+const contract = parseContract(contractSource, [tokenDocument]);
 ```
 
 ```ts
@@ -172,6 +176,10 @@ export const Default = {
         ],
         card: 'design-system-molecules-card--default',
       },
+      pages: {
+        dashboard: 'product-pages-dashboard--default',
+        profile: { id: 'product-pages-profile--default', label: 'Profile', path: 'Account/Settings' },
+      },
       controls: {
         button: {
           variants: { primary: { variant: 'primary' }, secondary: { variant: 'secondary' } },
@@ -185,7 +193,7 @@ export const Default = {
 };
 ```
 
-The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. A component may map to one story or to several named platform implementations; the inspector switches between them without changing the governing contract. Implementation entries may also carry their own `controls` when adapters expose different Storybook args. Explicit controls bind contract variants, data states, and width modes to real args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
+The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. A component may map to one story or to several named platform implementations; the inspector switches between them without changing the governing contract. Implementation entries may also carry their own `controls` when adapters expose different Storybook args. Page entries accept an optional `label` and slash-delimited or array `path`; the Atomic View renders those paths as collapsible folders while plain string mappings remain valid. Its search filters foundations, composition, components, pages, and page-folder ancestry. Explicit controls bind contract variants, data states, and width modes to real args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
 
 The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
 

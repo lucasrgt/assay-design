@@ -1,23 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { assertComposition, mergeContracts, parseContract, type DesignContract } from './index.js';
-
-function tokenValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ');
-  if (value && typeof value === 'object' && 'value' in value) return `${String((value as Record<string, unknown>).value)}${String((value as Record<string, unknown>).unit ?? '')}`;
-  return String(value);
-}
-
-function tokenEntries(value: unknown, prefix = ''): [string, string][] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-  const row = value as Record<string, unknown>;
-  if ('$value' in row) return prefix ? [[prefix, tokenValue(row.$value)]] : [];
-  return Object.entries(row).flatMap(([key, child]) => key.startsWith('$') ? [] : tokenEntries(child, prefix ? `${prefix}.${key}` : key));
-}
+import { flattenTokenDocuments } from './tokens.js';
 
 async function loadTokens(file: string, tokenFiles: readonly string[]) {
   const dir = dirname(file);
-  return Object.fromEntries((await Promise.all(tokenFiles.map(async (path) => tokenEntries(JSON.parse(await readFile(resolve(dir, path), 'utf8')))))).flat());
+  return flattenTokenDocuments(await Promise.all(tokenFiles.map(async (path) => JSON.parse(await readFile(resolve(dir, path), 'utf8')))));
 }
 
 export async function loadContract(file = '.design/contract.toml', seen = new Set<string>()): Promise<DesignContract> {
@@ -31,7 +19,7 @@ export async function loadContract(file = '.design/contract.toml', seen = new Se
     const base = await loadContract(resolve(dir, parent), new Set(seen));
     merged = merged ? mergeContracts(merged, base) : base;
   }
-  parsed.tokens = await loadTokens(absolute, parsed.tokenFiles);
+  Object.assign(parsed, await loadTokens(absolute, parsed.tokenFiles));
   const contract = merged ? mergeContracts(merged, parsed, true) : parsed;
   assertComposition(contract);
   return contract;

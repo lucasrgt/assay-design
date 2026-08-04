@@ -6,13 +6,14 @@ export const VERDICT_EVENT = `${ADDON_ID}/verdict`;
 export const REQUEST_EVENT = `${ADDON_ID}/request`;
 
 export type StoryArgs = Record<string, string | number | boolean | null>;
-export type DesignStoryControls = Partial<Record<'variants' | 'states' | 'widths', Record<string, StoryArgs>>>;
-export type DesignStoryImplementation = { id: string; label?: string; platform?: string; controls?: DesignStoryControls };
+export type DesignStoryControls = Record<string, Record<string, StoryArgs> | undefined>;
+export type DesignStoryImplementation = { id: string; label?: string; platform?: string; path?: string | readonly string[]; controls?: DesignStoryControls };
 export type DesignStoryReference = string | DesignStoryImplementation | readonly DesignStoryImplementation[];
 export type DesignStoryMap = Record<string, DesignStoryReference>;
 export type DesignPanelPayload = Verdict & {
-  contract: Pick<DesignContract, 'name' | 'components' | 'surfaces'>;
+  contract: Pick<DesignContract, 'name' | 'components' | 'surfaces' | 'tokens' | 'tokenMeta'>;
   evidence: DesignEvidence;
   stories: DesignStoryMap;
+  pages?: DesignStoryMap;
   controls?: Record<string, DesignStoryControls>;
 };

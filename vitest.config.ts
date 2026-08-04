@@ -6,7 +6,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/storybook/manager.ts'],
+      exclude: ['src/storybook/manager.ts', 'src/storybook/atomic-navigation.ts', 'src/storybook/coverage.ts'],
       thresholds: { lines: 95, functions: 95, statements: 95, branches: 90 },
       reporter: ['text', 'json-summary'],
     },

@@ -23,8 +23,11 @@ describe('contract', () => {
     const directory = await mkdtemp(join(tmpdir(), 'assay-design-'));
     const file = join(directory, 'contract.toml');
     await writeFile(file, source);
-    await writeFile(join(directory, 'tokens.json'), JSON.stringify({ color: { action: { primary: { $type: 'color', $value: '#00f' } }, $description: 'colors' }, ignored: 1 }));
-    expect((await loadContract(file)).tokens).toEqual({ 'color.action.primary': '#00f' });
+    await writeFile(join(directory, 'tokens.json'), JSON.stringify({ color: { $type: 'color', action: { primary: { $value: '#00f' } }, $description: 'colors' }, ignored: 1 }));
+    const loaded = await loadContract(file);
+    expect(loaded.tokens).toEqual({ 'color.action.primary': '#00f' });
+    expect(loaded.tokenMeta).toEqual({ 'color.action.primary': { type: 'color', group: 'color', section: 'action' } });
+    expect(parseContract(source, [{ space: { $type: 'dimension', sm: { $value: { value: 8, unit: 'px' } } } }]).tokenMeta?.['space.sm']).toEqual({ type: 'dimension', group: 'space' });
   });
 
   it('merges an org language through extends and detects cycles', async () => {
@@ -139,6 +142,46 @@ describe('evidence', () => {
     expect(collectDocument(button, 'dashboard').nodes[0]).toMatchObject({ component: 'button', icon: 'plus', iconIntent: 'add' });
   });
 
+  it('rejects rendered colors that match no design token', () => {
+    document.body.innerHTML = `<span data-ui="text" style="color: #2563eb">Token color</span>`;
+    const aligned = collectDocument(document, 'dashboard');
+    expect(aligned.styles).toEqual(expect.arrayContaining([expect.objectContaining({ property: 'color', value: 'rgb(37, 99, 235)', subject: 'text' })]));
+    expect(inspectEvidence(contract(), aligned).some((finding) => finding.rule === 'tokens/unbound-color')).toBe(false);
+    document.querySelector('span')!.setAttribute('style', 'color: #000000');
+    const findings = inspectEvidence(contract(), collectDocument(document, 'dashboard'));
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'tokens/unbound-color', category: 'tokens', message: expect.stringContaining('rgb(0, 0, 0)') }),
+    ]));
+    const palette = { ...contract(), tokens: { ...contract().tokens, 'color.content': '#000', 'color.surface': '#fff', 'color.border': '#f00' } };
+    document.body.innerHTML = `<span data-ui="text" style="color:#000;background:#fff;border:1px solid #f00">Aligned</span>`;
+    const rendered = collectDocument(document, 'dashboard');
+    expect(rendered.styles?.map((item) => item.property)).toEqual(expect.arrayContaining(['color', 'background-color', 'border-color']));
+    expect(inspectEvidence(palette, rendered).some((finding) => finding.rule === 'tokens/unbound-color')).toBe(false);
+  });
+
+  it('owns slots locally and applies theme-aware semantic color bindings', () => {
+    const bound = contract();
+    bound.tokens = { ...bound.tokens, 'color.dark.content.primary': '#f8fafb', 'color.dark.content.onAction': '#000', 'color.dark.action.primary': '#3fc4e1' };
+    const text = bound.components.find((component) => component.name === 'text')!;
+    text.styleBindings = [{ property: 'color', role: 'heading', tokens: ['color.content.primary'] }];
+    const button = bound.components.find((component) => component.name === 'button')!;
+    button.appearances = ['solid', 'outline'];
+    button.styleBindings = [
+      { property: 'background-color', variant: 'primary', appearance: 'solid', tokens: ['color.action.primary'] },
+      { property: 'color', slot: 'label', variant: 'primary', appearance: 'solid', tokens: ['color.content.onAction'] },
+    ];
+    document.documentElement.dataset.theme = 'dark';
+    document.body.innerHTML = `<main data-ui="shell"><section data-ui="card"><span data-ui="text" data-role="heading" style="color:#000">Heading</span><button data-ui="button" data-variant="primary" data-appearance="solid" style="background:#3fc4e1"><span data-ui-slot="label" style="color:#000">Create</span></button></section></main>`;
+    const rendered = collectDocument(document, 'dashboard');
+    expect(rendered.nodes[0]?.slots).toBeUndefined();
+    expect(rendered.nodes[1]?.slots).toBeUndefined();
+    expect(rendered.nodes[3]).toMatchObject({ appearance: 'solid', slots: ['label'] });
+    const mismatches = inspectEvidence(bound, rendered).filter((finding) => finding.rule === 'tokens/semantic-color-mismatch');
+    expect(mismatches).toHaveLength(1);
+    expect(mismatches[0]?.path).toContain('text');
+    delete document.documentElement.dataset.theme;
+  });
+
   it('requires container-filling components to declare a sanctioned full-width exception', () => {
     document.body.innerHTML = `<div id="region"><button data-ds="button" data-variant="secondary"><span data-ds-slot="label">Continue</span></button></div>`;
     const region = document.querySelector('#region')!;
@@ -158,6 +201,28 @@ describe('evidence', () => {
     expect(inspectEvidence(forbidden, collectDocument(button, 'dashboard'))).toEqual(expect.arrayContaining([
       expect.objectContaining({ rule: 'component/full-width-not-allowed', category: 'properties' }),
     ]));
+  });
+
+  it('rejects rendered component geometry and elevation outside semantic bindings', () => {
+    const bound = contract();
+    bound.tokens = { ...bound.tokens, 'size.control.entry': '56px', 'radius.lg': '12px', 'elevation.md': '0 6px 16px rgba(16, 24, 40, 0.08)' };
+    const button = bound.components.find((component) => component.name === 'button')!;
+    button.styleBindings = [
+      { property: 'min-height', variant: 'primary', tokens: ['size.control.entry'] },
+      { property: 'border-radius', variant: 'primary', tokens: ['radius.lg'] },
+      { property: 'box-shadow', variant: 'primary', tokens: ['elevation.md'] },
+    ];
+    document.body.innerHTML = `<button data-ui="button" data-variant="primary" style="min-height:48px;border-radius:8px;box-shadow:0 2px 4px rgba(16,24,40,.06)"><span data-ui-slot="label">Continue</span></button>`;
+    const rendered = collectDocument(document, 'dashboard');
+    expect(rendered.styles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ property: 'min-height', value: '48px' }),
+      expect.objectContaining({ property: 'border-radius', value: '8px' }),
+      expect.objectContaining({ property: 'box-shadow' }),
+    ]));
+    expect(inspectEvidence(bound, rendered).filter((finding) => finding.rule === 'tokens/semantic-style-mismatch')).toHaveLength(3);
+
+    document.querySelector('button')!.setAttribute('style', 'min-height:56px;border-radius:12px;box-shadow:0 6px 16px rgba(16,24,40,.08)');
+    expect(inspectEvidence(bound, collectDocument(document, 'dashboard')).some((finding) => finding.rule === 'tokens/semantic-style-mismatch')).toBe(false);
   });
 });
 
@@ -182,7 +247,7 @@ describe('styles', () => {
   it('separates unresolved references from off-scale one-offs and coherence drift', () => {
     const findings = inspectStyles(contract(), collectStylesheet({ 'app.css': stylesheet }));
     const message = (category: string) => findings.filter((item) => item.category === category).map((item) => item.message);
-    expect(message('tokens')).toEqual(['Reference "--missing" resolves to no value in the design language']);
+    expect(message('tokens')).toEqual(['Replace raw color "#ff0000" with a semantic design token', 'Reference "--missing" resolves to no value in the design language']);
     expect(message('scale').some((item) => item.includes('"13px"') && item.includes('one-off'))).toBe(true);
     expect(message('scale').some((item) => item.includes('"#ff0000"'))).toBe(true);
     expect(message('coherence').some((item) => item.includes('padding') && item.includes('4px') && item.includes('8px'))).toBe(true);
@@ -202,7 +267,7 @@ describe('styles', () => {
 
   it('skips scale judgment when the language declares no token values', () => {
     const findings = inspectStyles(parseContract(source), collectStylesheet(stylesheet));
-    expect(findings.map((item) => item.category)).toEqual(['tokens']);
+    expect(findings.map((item) => item.category)).toEqual(['tokens', 'tokens']);
   });
 
   it('honours a contract that redeclares which properties a scale governs', async () => {
@@ -251,6 +316,13 @@ describe('population', () => {
     expect(collectUtilities('<div className="text-hp-green-700" />')[0]?.tokenCandidates).toContain('color.hp-green.700');
     expect(collectUtilities('<svg className="stroke-2" />')[0]).toMatchObject({ property: 'stroke-width', value: 'stroke-2' });
     expect(collectUtilities('<svg className="fill-none" />')[0]).not.toHaveProperty('tokenCandidates');
+    const rawColors = collectUtilities(`className="bg-[#2563eb]" style={{ color: '#2563eb', borderColor: 'rgb(0, 0, 0)' }}`, 'Button.tsx');
+    expect(rawColors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ property: 'background-color', value: '#2563eb', literal: true }),
+      expect.objectContaining({ property: 'color', value: '#2563eb', literal: true }),
+      expect.objectContaining({ property: 'border-color', value: 'rgb(0, 0, 0)', literal: true }),
+    ]));
+    expect(inspectStyles(contract(), rawColors).filter((finding) => finding.rule === 'tokens/raw-color-literal')).toHaveLength(3);
   });
 
   it('fails closed when an audit observes nothing or cannot compare subjects', async () => {

@@ -1,27 +1,31 @@
 import { archetype, AvpFail, criterion, mechanical, runVerification, type Verdict } from 'avp-assay';
 import { parse } from 'smol-toml';
 import { auditPopulation } from './coherence.js';
+import { flattenTokenDocuments, type DesignTokenMeta } from './tokens.js';
+export type { DesignTokenMeta } from './tokens.js';
 
 type Dict = Record<string, unknown>;
 export type Tier = 'atom' | 'molecule' | 'organism' | 'template';
+export interface StyleBinding { property: string; tokens: string[]; variant?: string; appearance?: string; state?: string; role?: string; slot?: string }
 export type FindingCategory = 'components' | 'properties' | 'composition' | 'semantics' | 'coverage' | 'tokens' | 'scale' | 'coherence';
 export interface ComponentContract {
-  name: string; tier: Tier; parts: string[]; variants: string[]; states: string[]; roles: string[]; requiredSlots: string[];
+  name: string; tier: Tier; parts: string[]; variants: string[]; appearances: string[]; states: string[]; roles: string[]; requiredSlots: string[]; styleBindings: StyleBinding[];
   inlineSizing?: 'bounded' | 'full'; allowFullWidth: boolean;
 }
 export interface SurfaceContract { name: string; template?: string; requiredComponents: string[]; states: string[]; themes: string[]; viewports: string[]; locales: string[] }
 export interface DesignContract {
   schema: 1; name: string; extends: string[]; tokenFiles: string[]; components: ComponentContract[]; surfaces: SurfaceContract[];
   icons: Record<string, string[]>; policies: { maxPrimaryActionsPerRegion: number; buttonLabelPattern?: string; maxHeadingJump: number; requireIconIntent: boolean };
-  links: Record<string, string[]>; scales: Record<string, string[]>; extensionPoints: string[]; tokens?: Record<string, string>;
+  links: Record<string, string[]>; scales: Record<string, string[]>; extensionPoints: string[]; tokens?: Record<string, string>; tokenMeta?: Record<string, DesignTokenMeta>;
 }
 /** One lossy, ephemeral fact emitted by an adapter for linting. It is not a UI model or codegen input. */
 export interface StyleDeclaration {
   origin: string; property: string; value: string; unresolved?: string[];
-  subject?: string; context?: string; tokenCandidates?: string[];
+  subject?: string; context?: string; tokenCandidates?: string[]; literal?: boolean; theme?: string;
+  component?: string; variant?: string; appearance?: string; state?: string; role?: string; slot?: string;
 }
 export interface EvidenceNode {
-  component: string; variant?: string; state?: string; role?: string; action?: string; icon?: string; iconIntent?: string;
+  component: string; variant?: string; appearance?: string; state?: string; role?: string; action?: string; icon?: string; iconIntent?: string;
   text?: string; region?: string; headingLevel?: number; tokens?: string[]; slots?: string[]; parent?: number;
   widthMode?: 'bounded' | 'full'; widthFlag?: string; inlineSize?: number; containerInlineSize?: number;
 }
@@ -54,7 +58,7 @@ type ContractDeclarations = { policies: string[]; scales: string[] };
 const contractDeclarations = new WeakMap<DesignContract, ContractDeclarations>();
 const declarationsOf = (contract: DesignContract): ContractDeclarations => contractDeclarations.get(contract) ?? { policies: Object.keys(contract.policies), scales: Object.keys(contract.scales) };
 
-export function parseContract(source: string): DesignContract {
+export function parseContract(source: string, tokenDocuments: readonly unknown[] = []): DesignContract {
   const raw = record(parse(source), 'contract');
   if (raw.schema !== 1) throw new Error('schema must be 1');
   const componentRows = raw.components ?? [];
@@ -69,9 +73,16 @@ export function parseContract(source: string): DesignContract {
     if (seen.has(name)) throw new Error(`component ${name} is declared twice`);
     seen.add(name);
     const inlineSizing = optionalText(row.inline_sizing, `${name}.inline_sizing`) as ComponentContract['inlineSizing'];
+    const bindingRows = row.style_bindings ?? [];
+    if (!Array.isArray(bindingRows)) throw new Error(`${name}.style_bindings must be an array of tables`);
+    const styleBindings = bindingRows.map((value, bindingIndex): StyleBinding => {
+      const binding = record(value, `${name}.style_bindings[${bindingIndex}]`);
+      const optional = (key: string) => optionalText(binding[key], `${name}.style_bindings[${bindingIndex}].${key}`);
+      return { property: text(binding.property, `${name}.style_bindings[${bindingIndex}].property`), tokens: strings(binding.tokens, `${name}.style_bindings[${bindingIndex}].tokens`), ...Object.fromEntries(['variant', 'appearance', 'state', 'role', 'slot'].flatMap((key) => { const value = optional(key); return value ? [[key, value]] : []; })) } as StyleBinding;
+    });
     if (inlineSizing && !['bounded', 'full'].includes(inlineSizing)) throw new Error(`${name}.inline_sizing must be "bounded" or "full"`);
     if (row.allow_full_width !== undefined && typeof row.allow_full_width !== 'boolean') throw new Error(`${name}.allow_full_width must be a boolean`);
-    return { name, tier, parts: strings(row.parts, `${name}.parts`), variants: strings(row.variants, `${name}.variants`), states: strings(row.states, `${name}.states`), roles: strings(row.roles, `${name}.roles`), requiredSlots: strings(row.required_slots, `${name}.required_slots`), ...(inlineSizing ? { inlineSizing } : {}), allowFullWidth: row.allow_full_width === true };
+    return { name, tier, parts: strings(row.parts, `${name}.parts`), variants: strings(row.variants, `${name}.variants`), appearances: strings(row.appearances, `${name}.appearances`), states: strings(row.states, `${name}.states`), roles: strings(row.roles, `${name}.roles`), requiredSlots: strings(row.required_slots, `${name}.required_slots`), styleBindings, ...(inlineSizing ? { inlineSizing } : {}), allowFullWidth: row.allow_full_width === true };
   });
   const surfaces = surfaceRows.map((value, index): SurfaceContract => {
     const row = record(value, `surfaces[${index}]`);
@@ -100,6 +111,7 @@ export function parseContract(source: string): DesignContract {
     schema: 1, name: text(raw.name, 'name'), extends: extendsFrom, tokenFiles: strings(raw.token_files, 'token_files'), components, surfaces, icons, links, scales, extensionPoints: strings(inheritance.extension_points, 'inheritance.extension_points'),
     policies: { maxPrimaryActionsPerRegion, maxHeadingJump, requireIconIntent: policies.require_icon_intent !== false, ...(buttonLabelPattern ? { buttonLabelPattern } : {}) },
   };
+  if (tokenDocuments.length) Object.assign(contract, flattenTokenDocuments(tokenDocuments));
   contractDeclarations.set(contract, { policies: declaredPolicies, scales: raw.scales === undefined ? [] : Object.keys(scales) });
   if (!extendsFrom.length) assertComposition(contract);
   return contract;
@@ -178,6 +190,7 @@ export function mergeContracts(base: DesignContract, overlay: DesignContract, ex
     scales: { ...base.scales, ...scales } as Record<string, string[]>,
     extensionPoints: [...new Set([...base.extensionPoints, ...overlay.extensionPoints])],
     tokens: { ...base.tokens, ...overlay.tokens },
+    tokenMeta: { ...base.tokenMeta, ...overlay.tokenMeta },
   };
   contractDeclarations.set(merged, {
     policies: [...new Set([...baseDeclarations.policies, ...overlayDeclarations.policies])],
@@ -202,7 +215,8 @@ export function collectStylesheet(sheets: string | Record<string, string>): Styl
       let value = raw.trim();
       for (let depth = 0; depth < 8 && value.includes('var('); depth += 1) value = value.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*))?\)/g, (_, name: string, fallback: string | undefined) => bindings.get(name) ?? (fallback?.trim() || (unresolved.push(name), 'unresolved')));
       const subject = selector.trim().replace(/\s+/g, ' ');
-      declarations.push({ origin: `${source} ${subject}`, subject, property, value, ...(unresolved.length ? { unresolved } : {}) });
+      const literal = /^(?:#|rgba?\(|hsla?\(|oklch\(|lab\(|lch\(|color\()/i.test(raw.trim());
+      declarations.push({ origin: `${source} ${subject}`, subject, property, value, ...(unresolved.length ? { unresolved } : {}), ...(literal ? { literal: true } : {}) });
     }
   }
   return declarations;
@@ -226,7 +240,7 @@ export function inspectEvidence(contract: DesignContract, evidence: DesignEviden
         else if (parent?.parts.length && !parent.parts.includes(spec.name)) add('atomic/undeclared-part', 'composition', `${path}.parent`, `${parent.name} does not declare "${spec.name}" as a part`);
       }
     }
-    for (const [property, value, allowed] of [['variant', node.variant, spec.variants], ['state', node.state, spec.states], ['role', node.role, spec.roles]] as const) {
+    for (const [property, value, allowed] of [['variant', node.variant, spec.variants], ['appearance', node.appearance, spec.appearances], ['state', node.state, spec.states], ['role', node.role, spec.roles]] as const) {
       if (value && !allowed.includes(value)) add(`component/undeclared-${property}`, 'properties', `${path}.${property}`, `"${value}" is outside ${node.component}.${property}s`);
     }
     if (node.widthFlag && node.widthFlag !== 'full') add('component/undeclared-width-mode', 'properties', `${path}.widthFlag`, `"${node.widthFlag}" is not a supported width flag`);
@@ -289,9 +303,9 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
     const value = (name: string) => element.getAttribute(`data-ds-${name}`) ?? element.getAttribute(`data-ui-${name}`) ?? element.getAttribute(`data-${name}`) ?? undefined;
     const component = element.getAttribute('data-ds') ?? element.getAttribute('data-ui') ?? '';
     const region = element.closest('[data-ds-region],[data-ui-region]');
-    const [variant, state, role, action, icon, iconIntent, widthFlag] = ['variant', 'state', 'role', 'action', 'icon', 'icon-intent', 'width'].map(value);
+    const [variant, appearance, state, role, action, icon, iconIntent, widthFlag] = ['variant', 'appearance', 'state', 'role', 'action', 'icon', 'icon-intent', 'width'].map(value);
     const regionName = region?.getAttribute('data-ds-region') ?? region?.getAttribute('data-ui-region') ?? undefined;
-    const slots = [...element.querySelectorAll('[data-ds-slot],[data-ui-slot]')].map((slot) => slot.getAttribute('data-ds-slot') ?? slot.getAttribute('data-ui-slot') ?? '').filter(Boolean);
+    const slots = [...element.querySelectorAll('[data-ds-slot],[data-ui-slot]')].filter((slot) => slot.parentElement?.closest(selector) === element).map((slot) => slot.getAttribute('data-ds-slot') ?? slot.getAttribute('data-ui-slot') ?? '').filter(Boolean);
     const headingLevel = /^H[1-6]$/.test(element.tagName) ? Number(element.tagName[1]) : undefined;
     const tokens = value('token')?.split(/\s+/).filter(Boolean);
     const parent = element.parentElement?.closest(selector);
@@ -306,9 +320,39 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
     const containerInlineSize = container?.width ? Math.max(0, container.width - parentPadding) : 0;
     const cssFull = style?.width === '100%' || Boolean(element.getAttribute('style')?.match(/(?:^|;)\s*width\s*:\s*100%\s*(?:;|$)/i));
     const widthMode = box.width > 0 && containerInlineSize > 0 ? (Math.abs(box.width - containerInlineSize) <= 1 ? 'full' : 'bounded') : cssFull ? 'full' : undefined;
-    return { component, ...(variant ? { variant } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}), ...(parentIndex !== undefined ? { parent: parentIndex } : {}), ...(widthFlag ? { widthFlag } : {}), ...(widthMode ? { widthMode } : {}), ...(box.width > 0 ? { inlineSize: box.width } : {}), ...(containerInlineSize > 0 ? { containerInlineSize } : {}) };
+    return { component, ...(variant ? { variant } : {}), ...(appearance ? { appearance } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}), ...(parentIndex !== undefined ? { parent: parentIndex } : {}), ...(widthFlag ? { widthFlag } : {}), ...(widthMode ? { widthMode } : {}), ...(box.width > 0 ? { inlineSize: box.width } : {}), ...(containerInlineSize > 0 ? { containerInlineSize } : {}) };
   });
-  return { surface, nodes, ...(coverage ? { coverage } : {}) };
+  const styles = elements.flatMap((element, index): StyleDeclaration[] => {
+    const component = nodes[index]?.component ?? '';
+    const node = nodes[index]!;
+    const context = [node.variant, node.appearance, node.state, node.role, node.headingLevel ? `h${node.headingLevel}` : undefined].filter(Boolean).join(':') || undefined;
+    const targets = [element, ...element.querySelectorAll('[data-ds-slot],[data-ui-slot]')].filter((target) => target === element || target.parentElement?.closest(selector) === element);
+    const theme = element.ownerDocument.documentElement.dataset.theme ?? (element.ownerDocument.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    return targets.flatMap((target): StyleDeclaration[] => {
+      const view = target.ownerDocument.defaultView;
+      const computed = view?.getComputedStyle(target);
+      if (!computed) return [];
+      const slot = target.getAttribute('data-ds-slot') ?? target.getAttribute('data-ui-slot');
+      const subject = `${component}${slot ? `.slot.${slot}` : ''}`;
+      const origin = `dom:${surface} ${subject}`;
+      const directText = [...target.childNodes].some((child) => child.nodeType === 3 && child.textContent?.trim());
+      const rows: [string, string][] = [];
+      if (directText || slot || component === 'text' || component === 'icon') rows.push(['color', computed.color]);
+      if (computed.backgroundColor && !['transparent', 'rgba(0, 0, 0, 0)'].includes(computed.backgroundColor)) rows.push(['background-color', computed.backgroundColor]);
+      const borderColors = [...new Set((['top', 'right', 'bottom', 'left'] as const).flatMap((edge) => Number.parseFloat(computed.getPropertyValue(`border-${edge}-width`)) > 0 ? [computed.getPropertyValue(`border-${edge}-color`)] : []).filter((color) => color && !['transparent', 'rgba(0, 0, 0, 0)'].includes(color)))];
+      if (borderColors.length === 1) rows.push(['border-color', borderColors[0]!]);
+      else borderColors.forEach((color, edge) => rows.push([`border-${edge}-color`, color]));
+      for (const property of ['min-height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'] as const) rows.push([property, computed.getPropertyValue(property)]);
+      const radii = (['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const).map((corner) => computed.getPropertyValue(`border-${corner}-radius`));
+      if (computed.borderRadius) rows.push(['border-radius', computed.borderRadius]);
+      else if (radii.every((radius) => radius === radii[0])) rows.push(['border-radius', radii[0]!]);
+      else radii.forEach((radius, corner) => rows.push([`border-${(['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const)[corner]}-radius`, radius]));
+      if (computed.boxShadow && computed.boxShadow !== 'none') rows.push(['box-shadow', computed.boxShadow]);
+      if (directText || slot || component === 'text') for (const property of ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing'] as const) rows.push([property, computed.getPropertyValue(property)]);
+      return rows.filter(([, value]) => value).map(([property, value]) => ({ origin, subject, ...(context ? { context } : {}), property, value, theme, component, ...(node.variant ? { variant: node.variant } : {}), ...(node.appearance ? { appearance: node.appearance } : {}), ...(node.state ? { state: node.state } : {}), ...(node.role ? { role: node.role } : {}), ...(slot ? { slot } : {}) }));
+    });
+  });
+  return { surface, nodes, ...(styles.length ? { styles } : {}), ...(coverage ? { coverage } : {}) };
 }
 
 export function designContext(contract: DesignContract) {

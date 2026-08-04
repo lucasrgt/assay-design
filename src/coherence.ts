@@ -46,6 +46,32 @@ const utilityPattern = /(?:^|[\s"'`:])((?:(?:[a-z][\w-]*):)*!?-?(?:min-w|min-h|m
 const utilityParts = /^!?(-?)(min-w|min-h|max-w|max-h|gap-x|gap-y|px|py|pt|pr|pb|pl|p|mx|my|mt|mr|mb|ml|m|gap|inset|top|right|bottom|left|text|leading|tracking|rounded|w|h|bg|fill|stroke|duration)-(.+)$/i;
 const spaceUtilities = new Set(['p', 'px', 'py', 'pt', 'pr', 'pb', 'pl', 'm', 'mx', 'my', 'mt', 'mr', 'mb', 'ml', 'gap', 'gap-x', 'gap-y', 'inset', 'top', 'right', 'bottom', 'left']);
 const structuralValues = new Set(['auto', 'current', 'inherit', 'none', 'transparent']);
+const ignoredComputedColors = new Set(['transparent', 'rgba(0,0,0,0)', '0,0,0,0', 'currentcolor', 'inherit', 'initial', 'unset']);
+const colorKey = (value: string) => {
+  const compact = value.toLowerCase().replace(/\s+/g, '');
+  const hex = compact.match(/^#([0-9a-f]{3,8})$/);
+  if (hex) {
+    let digits = hex[1]!;
+    if (digits.length === 3 || digits.length === 4) digits = [...digits].map((digit) => `${digit}${digit}`).join('');
+    if (digits.length === 6) digits += 'ff';
+    if (digits.length === 8) return `${Number.parseInt(digits.slice(0, 2), 16)},${Number.parseInt(digits.slice(2, 4), 16)},${Number.parseInt(digits.slice(4, 6), 16)},${Number.parseInt(digits.slice(6, 8), 16) / 255}`;
+  }
+  const rgb = compact.match(/^rgba?\((\d+(?:\.\d+)?),(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)(?:,(\d*\.?\d+))?\)$/);
+  return rgb ? `${rgb[1]},${rgb[2]},${rgb[3]},${rgb[4] ?? '1'}` : undefined;
+};
+const colorProperty = (property: string) => property === 'color' || property.endsWith('-color') || property === 'fill' || property === 'stroke';
+const colorLiteral = (value: string) => /^(?:#|rgba?\(|hsla?\(|oklch\(|lab\(|lch\(|color\()/i.test(value.trim());
+const styleKey = (property: string, value: string) => colorProperty(property)
+  ? colorKey(value)
+  : value.toLowerCase().trim().replace(/\s+/g, ' ').replace(/\s*,\s*/g, ',').replace(/(?<![\d])\.(\d+)/g, '0.$1');
+const themedToken = (name: string, theme: string | undefined, tokens: Record<string, string>) => {
+  if (!theme) return name;
+  const [group, ...rest] = name.split('.');
+  const themed = `${group}.${theme}.${rest.join('.')}`;
+  return themed in tokens ? themed : name;
+};
+const bindingMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
+  governs([binding.property], declaration.property) && (['variant', 'appearance', 'state', 'role', 'slot'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
 const paths = (group: string, value: string) => {
   const parts = value.split('-');
   const names = [
@@ -92,11 +118,15 @@ export function collectUtilities(source: string, origin = 'utilities'): StyleDec
     if (!property) continue;
     const value = `${negative}${decoded}`;
     const candidates = arbitrary || textAlign || strokeWidth ? [] : tokenCandidates(utility, decoded);
-    declarations.push({ origin: `${origin} ${raw}`, property, value: arbitrary ? value : bare, ...(candidates.length ? { tokenCandidates: candidates } : {}) });
+    declarations.push({ origin: `${origin} ${raw}`, property, value: arbitrary ? value : bare, ...(candidates.length ? { tokenCandidates: candidates } : {}), ...(arbitrary && colorProperty(property) && colorLiteral(value) ? { literal: true } : {}) });
   }
   for (const [, property = '', number = ''] of source.matchAll(/\b(padding|paddingTop|paddingBottom|paddingHorizontal|paddingVertical|margin|marginTop|marginBottom|gap|borderRadius|fontSize)\s*:\s*(\d+)\b/g)) {
     const css = property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`).replace('padding-horizontal', 'padding-inline').replace('padding-vertical', 'padding-block');
     declarations.push({ origin: `${origin} style`, property: css, value: `${number}px` });
+  }
+  for (const [, property = '', , value = ''] of source.matchAll(/\b(color|backgroundColor|borderColor|borderTopColor|borderRightColor|borderBottomColor|borderLeftColor|fill|stroke)\s*:\s*(['"])([^'"]+)\2/g)) {
+    const css = property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+    if (colorLiteral(value)) declarations.push({ origin: `${origin} style`, property: css, value, literal: true });
   }
   return declarations;
 }
@@ -130,12 +160,31 @@ export function auditPopulation(contract: DesignContract, declarations: readonly
   if (unobservedSources.length) coverageFindings.push({ rule: 'coverage/unobserved-source', category: 'coverage', path: 'audit.sources', message: `No observations were collected from: ${unobservedSources.join(', ')}` });
   if (settings.requireSubjects && !comparableSubjects.length) coverageFindings.push({ rule: 'coverage/no-comparable-subjects', category: 'coverage', path: 'audit.subjects', message: 'No comparable component subjects were identified; coherence cannot be decided' });
   const tokenFindings: Finding[] = [];
+  const tokenFindingKeys = new Set<string>();
+  const tokenFinding = (finding: Finding) => { const key = `${finding.rule}\0${finding.path}\0${finding.message}`; if (!tokenFindingKeys.has(key)) { tokenFindingKeys.add(key); tokenFindings.push(finding); } };
   const tokens = contract.tokens;
   for (const declaration of declarations) {
     const path = `${declaration.origin} { ${declaration.property} }`;
-    for (const name of declaration.unresolved ?? []) tokenFindings.push({ rule: 'tokens/unresolved-reference', category: 'tokens', path, message: `Reference "${name}" resolves to no value in the design language` });
+    for (const name of declaration.unresolved ?? []) tokenFinding({ rule: 'tokens/unresolved-reference', category: 'tokens', path, message: `Reference "${name}" resolves to no value in the design language` });
     if (declaration.tokenCandidates?.length && tokens && !declaration.tokenCandidates.some((name) => name in tokens)) {
-      tokenFindings.push({ rule: 'tokens/unknown-utility-token', category: 'tokens', path, message: `Utility "${declaration.value}" maps to no declared token (${declaration.tokenCandidates.join(' or ')})` });
+      tokenFinding({ rule: 'tokens/unknown-utility-token', category: 'tokens', path, message: `Utility "${declaration.value}" maps to no declared token (${declaration.tokenCandidates.join(' or ')})` });
+    }
+    const normalized = colorKey(declaration.value);
+    if (declaration.literal && colorProperty(declaration.property)) tokenFinding({ rule: 'tokens/raw-color-literal', category: 'tokens', path, message: `Replace raw color "${declaration.value}" with a semantic design token` });
+    else if (tokens && normalized && colorProperty(declaration.property) && !ignoredComputedColors.has(normalized)) {
+      const component = contract.components.find((item) => item.name === declaration.component);
+      const bindings = component?.styleBindings.filter((binding) => bindingMatches(binding, declaration)) ?? [];
+      const candidates = bindings.flatMap((binding) => binding.tokens.map((name) => themedToken(name, declaration.theme, tokens)));
+      const palette = Object.entries(tokens).filter(([name]) => contract.tokenMeta?.[name]?.type === 'color' || name.startsWith('color.')).filter(([name]) => !declaration.theme || name.includes(`.${declaration.theme}.`) || !/\.(?:light|dark)\./.test(name));
+      const allowed = (candidates.length ? candidates.flatMap((name) => tokens[name] ? [tokens[name]!] : []) : palette.map(([, value]) => value)).flatMap((value) => { const key = colorKey(value); return key ? [key] : []; });
+      if (!allowed.includes(normalized)) tokenFinding({ rule: candidates.length ? 'tokens/semantic-color-mismatch' : 'tokens/unbound-color', category: 'tokens', path, message: candidates.length ? `Computed color "${declaration.value}" must use ${candidates.join(' or ')}` : `Computed color "${declaration.value}" matches no declared design token` });
+    } else if (tokens && !colorProperty(declaration.property)) {
+      const component = contract.components.find((item) => item.name === declaration.component);
+      const bindings = component?.styleBindings.filter((binding) => bindingMatches(binding, declaration)) ?? [];
+      const candidates = bindings.flatMap((binding) => binding.tokens.map((name) => themedToken(name, declaration.theme, tokens)));
+      const observed = styleKey(declaration.property, declaration.value);
+      const allowed = candidates.flatMap((name) => tokens[name] ? [styleKey(declaration.property, tokens[name]!)] : []);
+      if (candidates.length && observed && !allowed.includes(observed)) tokenFinding({ rule: 'tokens/semantic-style-mismatch', category: 'tokens', path, message: `Computed ${declaration.property} "${declaration.value}" must use ${candidates.join(' or ')}` });
     }
   }
   if (!declarations.length || !tokens) return { census: [], findings: [...coverageFindings, ...tokenFindings], systematicThreshold, coverage };
@@ -154,6 +203,7 @@ export function auditPopulation(contract: DesignContract, declarations: readonly
     }
 
     for (const { group, properties, values: scale } of scales) {
+      if (group === 'color' && declaration.origin.startsWith('dom:')) continue;
       if (!scale.size || !governs(properties, declaration.property)) continue;
       for (const literal of literalsOf(group, declaration.value)) {
         if (scale.has(literal) || zero.test(literal)) continue;

@@ -102,10 +102,13 @@ name = "canonical-component"
     'color.canvas': '#08110f',
     'color.surface': '#101c18',
     'color.action.primary': '#b8f34a',
+    'color.content.primary': '#000000',
     'space.sm': '8px',
     'space.md': '16px',
     'radius.md': '14px',
     'fontSize.body': '16px',
+    'fontSize.title': '1.5em',
+    'fontSize.display': '2em',
   },
 };
 

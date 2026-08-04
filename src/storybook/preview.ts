@@ -25,9 +25,9 @@ export async function evaluateStory(contract: DesignContract, surface: string, c
   return verifyEvidence(contract, collectDocument(document, surface, coverage));
 }
 
-export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}): Promise<DesignPanelPayload> {
+export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}, pages: DesignStoryMap = {}): Promise<DesignPanelPayload> {
   const evidence = collectDocument(document, surface, coverage);
-  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces }, evidence, stories, controls };
+  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, pages, controls };
 }
 
 export function publishStoryPanel(channel: Channel, evaluate: () => Promise<DesignPanelPayload>) {
@@ -43,9 +43,9 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
 export default {
   decorators: [
     (Story: () => unknown, context: { parameters: Record<string, unknown> }, suppliedChannel?: Channel) => {
-      const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: DesignStoryMap; controls?: Record<string, DesignStoryControls> } | undefined;
+      const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: DesignStoryMap; pages?: DesignStoryMap; controls?: Record<string, DesignStoryControls> } | undefined;
       const channel = suppliedChannel ?? (globalThis as StorybookPreviewGlobal).__STORYBOOK_MODULE_PREVIEW_API__?.addons?.getChannel();
-      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls));
+      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls, settings.pages));
       return Story();
     },
   ],
