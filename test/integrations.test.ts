@@ -48,6 +48,8 @@ describe('Storybook', () => {
     document.body.innerHTML = '<div data-ds="card"><span data-ds-slot="content"></span></div>';
     expect((await evaluateStory(contract(), 'dashboard')).outcome).toBe('fail');
     expect((await evaluateStoryPanel(contract(), 'dashboard')).contract.components.some((item) => item.name === 'card')).toBe(true);
+    const legacy = { ...contract(), groups: undefined } as unknown as Parameters<typeof evaluateStoryPanel>[0];
+    expect((await evaluateStoryPanel(legacy, 'dashboard')).contract.groups).toEqual({ sharedLabel: 'Shared', foundations: [], composition: [] });
     expect(managerEntries(['base'])[0]).toBe('base');
     expect(managerEntries().at(-1)).toMatch(/manager\.js$/);
     expect(previewAnnotations()).toEqual(expect.arrayContaining([expect.stringMatching(/storybook-addon-pseudo-states.*preview/)]));

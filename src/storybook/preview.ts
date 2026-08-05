@@ -27,7 +27,8 @@ export async function evaluateStory(contract: DesignContract, surface: string, c
 
 export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}, pages: DesignStoryMap = {}, groups?: Partial<DesignGroups>): Promise<DesignPanelPayload> {
   const evidence = collectDocument(document, surface, coverage);
-  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, groups: contract.groups, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, pages, controls, ...(groups ? { groups } : {}) };
+  const contractGroups = contract.groups ?? { sharedLabel: 'Shared', foundations: [], composition: [] };
+  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, groups: contractGroups, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, pages, controls, ...(groups ? { groups } : {}) };
 }
 
 export function publishStoryPanel(channel: Channel, evaluate: () => Promise<DesignPanelPayload>) {

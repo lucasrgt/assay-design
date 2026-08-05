@@ -14,11 +14,17 @@ export type GroupedFoundation = FoundationGroup & { folder: string; selectionKey
 export type FoundationFolder = { label: string; foundations: GroupedFoundation[] };
 export type CompositionFolder = { label: string; components: ComponentContract[]; selection: string };
 
-export const effectiveGroups = (payload: Pick<DesignPanelPayload, 'contract' | 'groups'>): DesignGroups => ({
-  sharedLabel: payload.groups?.sharedLabel ?? payload.contract.groups?.sharedLabel ?? 'Shared',
-  foundations: payload.groups?.foundations ?? payload.contract.groups?.foundations ?? [],
-  composition: payload.groups?.composition ?? payload.contract.groups?.composition ?? [],
-});
+const groupRules = (value: unknown) => Array.isArray(value) ? value : [];
+
+export const effectiveGroups = (payload: Pick<DesignPanelPayload, 'contract' | 'groups'>): DesignGroups => {
+  const projection = payload?.groups as Partial<DesignGroups> | undefined;
+  const contract = payload?.contract?.groups as Partial<DesignGroups> | undefined;
+  return {
+    sharedLabel: projection?.sharedLabel ?? contract?.sharedLabel ?? 'Shared',
+    foundations: groupRules(projection?.foundations ?? contract?.foundations) as DesignGroups['foundations'],
+    composition: groupRules(projection?.composition ?? contract?.composition) as DesignGroups['composition'],
+  };
+};
 
 export function groupedFoundations(contract: Pick<DesignContract, 'tokens' | 'tokenMeta'>, groups?: Partial<DesignGroups>): FoundationFolder[] {
   const rules = groups?.foundations ?? [];

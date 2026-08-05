@@ -188,6 +188,8 @@ export function mergeContracts(base: DesignContract, overlay: DesignContract, ex
   const overlayDeclarations = declarationsOf(overlay);
   const policies = explicitOnly ? pick(overlay.policies, overlayDeclarations.policies) : overlay.policies;
   const scales = explicitOnly ? pick(overlay.scales, overlayDeclarations.scales) : overlay.scales;
+  const baseGroups = base.groups ?? { sharedLabel: 'Shared', foundations: [], composition: [] };
+  const overlayGroups = overlay.groups ?? { sharedLabel: 'Shared', foundations: [], composition: [] };
   const merged: DesignContract = {
     schema: 1,
     name: overlay.name,
@@ -200,9 +202,9 @@ export function mergeContracts(base: DesignContract, overlay: DesignContract, ex
     links: Object.fromEntries([...new Set([...Object.keys(base.links), ...Object.keys(overlay.links)])].map((key) => [key, [...new Set([...(base.links[key] ?? []), ...(overlay.links[key] ?? [])])]])),
     scales: { ...base.scales, ...scales } as Record<string, string[]>,
     groups: {
-      sharedLabel: overlayDeclarations.groups ? overlay.groups.sharedLabel : base.groups.sharedLabel,
-      foundations: [...base.groups.foundations, ...overlay.groups.foundations],
-      composition: [...base.groups.composition, ...overlay.groups.composition],
+      sharedLabel: overlayDeclarations.groups ? overlayGroups.sharedLabel : baseGroups.sharedLabel,
+      foundations: [...baseGroups.foundations, ...overlayGroups.foundations],
+      composition: [...baseGroups.composition, ...overlayGroups.composition],
     },
     extensionPoints: [...new Set([...base.extensionPoints, ...overlay.extensionPoints])],
     tokens: { ...base.tokens, ...overlay.tokens },

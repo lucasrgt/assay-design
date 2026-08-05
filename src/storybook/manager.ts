@@ -426,7 +426,15 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
 
 let cachedPayload: DesignPanelPayload | undefined;
 const subscribers = new Set<(payload: DesignPanelPayload) => void>();
-const cachePayload = (payload: DesignPanelPayload) => {
+const normalizePayload = (value: unknown): DesignPanelPayload | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const payload = value as DesignPanelPayload;
+  if (!payload.contract || !Array.isArray(payload.contract.components) || !Array.isArray(payload.contract.surfaces)) return undefined;
+  return { ...payload, contract: { ...payload.contract, groups: effectiveGroups(payload) } };
+};
+const cachePayload = (value: unknown) => {
+  const payload = normalizePayload(value);
+  if (!payload) return;
   cachedPayload = payload;
   for (const subscriber of subscribers) subscriber(payload);
 };
@@ -434,7 +442,7 @@ const cachePayload = (payload: DesignPanelPayload) => {
 function DesignPage() {
   const theme = useTheme();
   const [payload, setPayload] = React.useState(cachedPayload);
-  const [persistedPayload, setPersistedPayload] = useAddonState<DesignPanelPayload | undefined>(`${ADDON_ID}/last-payload`, undefined);
+  const [persistedPayload, setPersistedPayload] = useAddonState<unknown>(`${ADDON_ID}/payload-v2`, undefined);
   const emit = useChannel({});
   React.useEffect(() => {
     const update = (next: DesignPanelPayload) => {
@@ -446,7 +454,7 @@ function DesignPage() {
     emit(REQUEST_EVENT);
     return () => { subscribers.delete(update); };
   }, [emit, setPersistedPayload]);
-  const visiblePayload = payload ?? persistedPayload;
+  const visiblePayload = normalizePayload(payload ?? persistedPayload);
   return visiblePayload ? element(Workbench, { payload: visiblePayload }) : element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } }, element(EmptyTabContent, { title: 'No live design evidence', description: 'Open a story with parameters.designHarness, then return to Design Contract.' }));
 }
 
