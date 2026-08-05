@@ -15,10 +15,9 @@ export type FoundationFolder = { label: string; foundations: GroupedFoundation[]
 export type CompositionFolder = { label: string; components: ComponentContract[]; selection: string };
 
 export const effectiveGroups = (payload: Pick<DesignPanelPayload, 'contract' | 'groups'>): DesignGroups => ({
-  ...payload.contract.groups,
-  ...payload.groups,
-  foundations: payload.groups?.foundations ?? payload.contract.groups.foundations,
-  composition: payload.groups?.composition ?? payload.contract.groups.composition,
+  sharedLabel: payload.groups?.sharedLabel ?? payload.contract.groups?.sharedLabel ?? 'Shared',
+  foundations: payload.groups?.foundations ?? payload.contract.groups?.foundations ?? [],
+  composition: payload.groups?.composition ?? payload.contract.groups?.composition ?? [],
 });
 
 export function groupedFoundations(contract: Pick<DesignContract, 'tokens' | 'tokenMeta'>, groups?: Partial<DesignGroups>): FoundationFolder[] {

@@ -74,5 +74,6 @@ include=["account-*"]`);
   it('allows a projection to override only one grouping axis', () => {
     const payload = { contract: configured, groups: { sharedLabel: 'Common', composition: [{ label: 'Core', include: ['text'] }] } };
     expect(effectiveGroups(payload)).toEqual({ sharedLabel: 'Common', foundations: configured.groups.foundations, composition: [{ label: 'Core', include: ['text'] }] });
+    expect(effectiveGroups({ contract: { ...configured, groups: undefined! } })).toEqual({ sharedLabel: 'Shared', foundations: [], composition: [] });
   });
 });
