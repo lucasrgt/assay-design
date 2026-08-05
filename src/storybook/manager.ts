@@ -8,6 +8,8 @@ import { FoundationPreview, foundationGroups, foundationSelection, selectedFound
 import { AtomIcon, AtomicNavigation } from './atomic-navigation.js';
 import { COMPOSITION_VIEW, displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, pageBackedImplementations, pageSelection, selectedPage, selectionOwnsStory } from './atomic-navigation-model.js';
 import { CoverageView } from './coverage.js';
+import { DevicePreviewFrame } from './device-preview.js';
+import { mobileViewport } from './device-preview-model.js';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryImplementation } from './shared.js';
 
 const TAB_ID = `${ADDON_ID}/tab`;
@@ -20,7 +22,6 @@ type Tab = 'inventory' | 'coverage' | 'violations';
 type Finding = { rule: string; category: string; path: string; message: string };
 type Result = { criterionId?: string; status?: string; reason?: string; evidence?: Finding[] };
 type PreviewViewport = 'desktop' | 'mobile';
-const mobileViewport = { label: 'iPhone 15', width: 393, height: 852 } as const;
 
 const styles = {
   root: { display: 'flex', flexDirection: 'column' as const, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box' as const, padding: '0 20px', color: 'var(--ad-text)', background: 'var(--ad-canvas)', fontFamily: 'var(--ad-font)' },
@@ -67,8 +68,6 @@ const styles = {
   componentMetaChip: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, marginRight: 3, padding: '4px 7px', borderRadius: 20, fontFamily: 'var(--ad-font)', fontSize: 10, fontWeight: 600, lineHeight: '12px', letterSpacing: 0 },
   previewFrame: { position: 'relative' as const, display: 'flex', flex: '1 1 0', minHeight: 0, overflow: 'hidden' },
   preview: { display: 'block', flex: '1 1 auto', width: '100%', height: '100%', minHeight: 0, border: 0, borderRadius: 0, background: 'var(--ad-panel)' },
-  mobileCanvas: { alignItems: 'flex-start', justifyContent: 'center', padding: 12, overflow: 'auto', background: 'var(--ad-canvas)', boxSizing: 'border-box' as const },
-  mobileFrame: { display: 'block', flex: '0 0 auto', width: mobileViewport.width, height: mobileViewport.height, minHeight: mobileViewport.height, maxWidth: '100%', border: '1px solid var(--ad-line)', background: 'var(--ad-panel)' },
   previewGallery: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', alignContent: 'start', gap: 10, width: '100%', height: '100%', minHeight: 0, padding: 10, boxSizing: 'border-box' as const, overflowY: 'auto' as const, overscrollBehavior: 'contain' as const, background: 'var(--ad-canvas)' },
   previewCard: { display: 'flex', flexDirection: 'column' as const, alignSelf: 'start', minWidth: 0, minHeight: 0, height: 'max-content', overflow: 'hidden', border: '1px solid var(--ad-line)', borderRadius: 'var(--ad-radius)', background: 'var(--ad-panel)' },
   previewCardHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 32, padding: '5px 8px', borderBottom: '1px solid var(--ad-line)', color: 'var(--ad-text)', fontSize: 11, fontWeight: 600 },
@@ -221,7 +220,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
         element('span', { style: styles.componentIdentity }, element('span', { style: styles.tierBadge }, element(BrowserIcon, { style: { ...styles.treeIcon, color: 'var(--ad-story)' } }), 'Page'), element('span', { style: styles.componentMetaTitle }, pageLabel)),
         element('span', { style: styles.componentMetaActions }, element(ViewportSwitch, { value: viewport, onChange: setViewport }), element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: dark, ariaLabel: dark ? 'Use light mode' : 'Use dark mode', title: dark ? 'Use light mode' : 'Use dark mode', onClick: () => updateGlobals({ theme: dark ? 'light' : 'dark' }), style: styles.comparisonAction }, dark ? element(SunIcon) : element(MoonIcon))),
       )),
-      story ? element('div', { style: { ...styles.previewFrame, ...(mobile ? styles.mobileCanvas : {}) } }, element('iframe', { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}`, scrolling: 'auto', style: mobile ? styles.mobileFrame : styles.preview })) : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No page story mapped' })),
+      story ? element('div', { style: styles.previewFrame }, mobile ? element(DevicePreviewFrame, { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}` }) : element('iframe', { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}`, scrolling: 'auto', style: styles.preview })) : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No page story mapped' })),
     );
   }
   const component = payload.contract.components.find((item) => item.name === name);
@@ -293,23 +292,25 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
         );
       })) : null,
     ),
-    element('div', { style: { ...styles.previewFrame, ...(!comparisonFrames.length && currentPreview.story && !advanced && mobile ? styles.mobileCanvas : {}) } },
+    element('div', { style: styles.previewFrame },
       comparisonFrames.length
         ? element('div', { className: 'assay-scrollbar', style: { ...styles.previewGallery, ...(mobile ? { gridTemplateColumns: `repeat(auto-fit, ${mobileViewport.width}px)`, justifyContent: 'center' } : {}) } }, ...comparisonFrames.map((frame) => element('article', { key: frame.key, style: { ...styles.previewCard, ...(mobile ? { width: mobileViewport.width } : {}) } },
           element('header', { style: styles.previewCardHeader }, element('span', null, frame.label), frame.story ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true }, element('a', { href: `?path=/story/${encodeURIComponent(frame.story)}${frame.query ? `&args=${encodeURIComponent(frame.query)}` : ''}${frame.globals ? `&globals=${encodeURIComponent(frame.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null),
-          frame.source ? element('iframe', { title: `${component.name} ${frame.label}`, src: frame.source, loading: 'lazy', scrolling: 'auto', 'data-inspection-key': frame.key, onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: mobile ? { ...styles.previewCardFrame, flexBasis: mobileViewport.height, height: mobileViewport.height } : styles.previewCardFrame }) : null,
+          frame.source ? mobile
+            ? element(DevicePreviewFrame, { title: `${component.name} ${frame.label}`, src: frame.source, loading: 'lazy', fitHeight: 520, inspectionKey: frame.key, onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget) })
+            : element('iframe', { title: `${component.name} ${frame.label}`, src: frame.source, loading: 'lazy', scrolling: 'auto', 'data-inspection-key': frame.key, onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.previewCardFrame }) : null,
           advanced ? element(InspectionFacts, { facts: inspections[frame.key], compact: true }) : null,
         )))
         : currentPreview.story
           ? advanced
             ? element('div', { style: styles.advancedPreview },
-              element('div', { style: { ...styles.advancedCanvas, ...(mobile ? styles.mobileCanvas : {}) } },
-                element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: mobile ? styles.mobileFrame : styles.preview }),
+              element('div', { style: styles.advancedCanvas },
+                mobile ? element(DevicePreviewFrame, { title: `${component.name} canonical story`, src: currentPreview.source, inspectionKey: '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget) }) : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.preview }),
                 element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(currentPreview.story)}${currentPreview.query ? `&args=${encodeURIComponent(currentPreview.query)}` : ''}${currentPreview.globals ? `&globals=${encodeURIComponent(currentPreview.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))),
               ),
               element(InspectionFacts, { facts: inspections.$single }),
             )
-            : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: mobile ? styles.mobileFrame : styles.preview })
+            : mobile ? element(DevicePreviewFrame, { title: `${component.name} canonical story`, src: currentPreview.source, inspectionKey: '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget) }) : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.preview })
         : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' })),
       !comparisonFrames.length && currentPreview.story && !advanced ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(currentPreview.story)}${currentPreview.query ? `&args=${encodeURIComponent(currentPreview.query)}` : ''}${currentPreview.globals ? `&globals=${encodeURIComponent(currentPreview.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
