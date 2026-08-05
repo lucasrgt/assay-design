@@ -2,6 +2,7 @@ import React from 'react';
 import { BookmarkHollowIcon, BrowserIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, DocumentIcon, FolderIcon, GridIcon, MergeIcon, PaintBrushIcon, SearchIcon } from '@storybook/icons';
 import { Button, EmptyTabContent } from 'storybook/internal/components';
 import { foundationGroups, foundationSelection } from './foundations.js';
+import { compositionFolders, effectiveGroups, groupedFoundations } from './grouping.js';
 import { COMPOSITION_VIEW, displayName, inspectableComponentNames, pageHierarchy, pageSelection, type DesignPageFolder, navigationMatches } from './atomic-navigation-model.js';
 import type { DesignPanelPayload } from './shared.js';
 
@@ -32,7 +33,9 @@ export function AtomicNavigation({ payload, selected, onSelect }: { payload: Des
   const [query, setQuery] = React.useState('');
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const normalized = query.trim().toLocaleLowerCase();
-  const foundations = foundationGroups(payload.contract).filter((group) => navigationMatches(normalized, group.label, group.id));
+  const groups = effectiveGroups(payload);
+  const foundationFolders = groupedFoundations(payload.contract, groups).map((folder) => ({ ...folder, foundations: folder.foundations.filter((foundation) => navigationMatches(normalized, folder.label, foundation.label, foundation.id, ...foundation.tokens.map((token) => token.name))) })).filter((folder) => folder.foundations.length);
+  const foundations = foundationFolders.length ? [] : foundationGroups(payload.contract).filter((foundation) => navigationMatches(normalized, foundation.label, foundation.id));
   const mapped = inspectableComponentNames(payload);
   const pages = pageHierarchy(payload, normalized);
   const toggle = (key: string) => setCollapsed((current) => ({ ...current, [key]: !current[key] }));
@@ -48,15 +51,30 @@ export function AtomicNavigation({ payload, selected, onSelect }: { payload: Des
   const renderFolder = (folder: DesignPageFolder, depth = 0): React.ReactNode => element(React.Fragment, { key: folder.key || '$pages' },
     ...folder.folders.map((child) => group(`folder:${child.key}`, child.name, FolderIcon, 'var(--ad-muted)', element('div', { style: css.folderChildren }, renderFolder(child, depth + 1)), depth)),
     ...folder.pages.map((page) => row(page.name, page.label, pageSelection(page.name), depth)));
-  const componentGroups = tiers.flatMap((tier) => {
-    const components = payload.contract.components.filter((component) => component.tier === tier && mapped.has(component.name) && navigationMatches(normalized, displayName(component.name), component.name));
+  const renderTierGroups = (members = payload.contract.components) => tiers.flatMap((tier) => {
+    const components = members.filter((component) => component.tier === tier && mapped.has(component.name) && navigationMatches(normalized, displayName(component.name), component.name));
     return components.length ? [group(tier, `${tier[0]!.toUpperCase()}${tier.slice(1)}s`, tierIcons[tier], tierColors[tier], element('div', { style: css.children }, ...components.map((component) => row(component.name, displayName(component.name), component.name))))] : [];
   });
-  const hasResults = foundations.length || componentGroups.length || Boolean(pages?.folders.length || pages?.pages.length) || navigationMatches(normalized, 'composition');
+  const folders = compositionFolders(payload.contract.components, groups).map((folder) => ({ ...folder, components: folder.components.filter((component) => mapped.has(component.name) && navigationMatches(normalized, folder.label, displayName(component.name), component.name)) })).filter((folder) => folder.components.length);
+  const componentGroups = folders.length ? [] : renderTierGroups();
+  const composition = folders.length
+    ? group('$composition', 'Composition', MergeIcon, 'var(--ad-muted)', element('div', { style: css.folderChildren },
+      navigationMatches(normalized, 'composition overview') ? row('$composition-overview', 'Overview', COMPOSITION_VIEW, 0, MergeIcon, 'var(--ad-muted)') : null,
+      ...folders.map((folder) => group(`composition:${folder.label}`, folder.label, FolderIcon, 'var(--ad-muted)', element('div', { style: css.folderChildren }, ...renderTierGroups(folder.components)))),
+    ))
+    : navigationMatches(normalized, 'composition') ? row('$composition', 'Composition', COMPOSITION_VIEW, 0, MergeIcon, 'var(--ad-muted)') : null;
+  const foundationNavigation = foundationFolders.length
+    ? group('$foundations', 'Foundations', PaintBrushIcon, 'var(--ad-foundation)',
+      element('div', { style: css.folderChildren }, ...foundationFolders.map((folder) =>
+        group(`foundation:${folder.label}`, folder.label, FolderIcon, 'var(--ad-muted)',
+          element('div', { style: css.folderChildren }, ...folder.foundations.map((foundation) =>
+            row(foundation.selectionKey, foundation.label, foundationSelection(foundation.selectionKey), 0, BookmarkHollowIcon, 'var(--ad-foundation)')))))))
+    : foundations.length ? group('$foundations', 'Foundations', PaintBrushIcon, 'var(--ad-foundation)', element('div', { style: css.children }, ...foundations.map((foundation) => row(foundation.id, foundation.label, foundationSelection(foundation.id), 0, BookmarkHollowIcon, 'var(--ad-foundation)')))) : null;
+  const hasResults = foundationFolders.length || foundations.length || componentGroups.length || folders.length || Boolean(pages?.folders.length || pages?.pages.length) || navigationMatches(normalized, 'composition');
   return element(React.Fragment, null,
     element('label', { style: css.search }, element(SearchIcon, { style: { ...css.icon, color: 'var(--ad-muted)' } }), element('input', { value: query, onChange: (event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value), placeholder: 'Find design items', 'aria-label': 'Find design items', style: css.searchInput })),
-    navigationMatches(normalized, 'composition') ? row('$composition', 'Composition', COMPOSITION_VIEW, 0, MergeIcon, 'var(--ad-muted)') : null,
-    foundations.length ? group('$foundations', 'Foundations', PaintBrushIcon, 'var(--ad-foundation)', element('div', { style: css.children }, ...foundations.map((foundation) => row(foundation.id, foundation.label, foundationSelection(foundation.id), 0, BookmarkHollowIcon, 'var(--ad-foundation)')))) : null,
+    composition,
+    foundationNavigation,
     ...componentGroups,
     pages && (pages.folders.length || pages.pages.length) ? group('$pages', 'Pages', BrowserIcon, 'var(--ad-story)', element('div', { style: css.children }, renderFolder(pages))) : null,
     !hasResults ? element(EmptyTabContent, { title: 'No design items found', description: `No Atomic View items match “${query.trim()}”.` }) : null,

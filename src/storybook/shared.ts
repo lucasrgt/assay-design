@@ -1,4 +1,5 @@
-import type { DesignContract, DesignEvidence } from '../index.js';
+import type { DesignContract, DesignEvidence, DesignGroups } from '../index.js';
+export type { DesignGroups, DesignGroupRule } from '../index.js';
 import type { Verdict } from 'avp-assay';
 
 export const ADDON_ID = 'assay-design';
@@ -11,9 +12,10 @@ export type DesignStoryImplementation = { id: string; label?: string; platform?:
 export type DesignStoryReference = string | DesignStoryImplementation | readonly DesignStoryImplementation[];
 export type DesignStoryMap = Record<string, DesignStoryReference>;
 export type DesignPanelPayload = Verdict & {
-  contract: Pick<DesignContract, 'name' | 'components' | 'surfaces' | 'tokens' | 'tokenMeta'>;
+  contract: Pick<DesignContract, 'name' | 'components' | 'surfaces' | 'tokens' | 'tokenMeta' | 'groups'>;
   evidence: DesignEvidence;
   stories: DesignStoryMap;
   pages?: DesignStoryMap;
   controls?: Record<string, DesignStoryControls>;
+  groups?: Partial<DesignGroups>;
 };

@@ -29,6 +29,17 @@ export const showcaseContract = {
   ...parseContract(`schema = 1
 name = "assay-showcase"
 
+[groups]
+shared_label = "Shared"
+
+[[groups.foundations]]
+label = "Brand"
+include = ["color.*"]
+
+[[groups.composition]]
+label = "Dashboard"
+include = ["dashboard-*", "application-shell"]
+
 [policies]
 max_primary_actions_per_region = 1
 button_label_pattern = "^[A-Z].+"

@@ -13,7 +13,7 @@ The three design surfaces have deliberately different jobs:
 ## Start
 
 ```sh
-npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.4.4/assay-design-0.4.4.tgz
+npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.5.0/assay-design-0.5.0.tgz
 npx assay-design init
 npx assay-design doctor
 npx assay-design context
@@ -24,6 +24,27 @@ npx assay-design check --evidence evidence.json
 The release asset is an ordinary `npm pack` tarball and is the current canonical distribution. The package name remains `assay-design`; registry publication can use the same artifact when npm credentials are configured.
 
 `contract.toml` makes Atomic Design executable rather than decorative. Components declare `atom`, `molecule`, `organism`, or `template` plus their allowed `parts`; atoms cannot compose components, lower tiers cannot contain higher tiers, cycles and unknown parts are rejected, and every surface can bind a declared template. Pages live as `surface` contracts because they are product instances, not reusable design-system components. Same-tier composition is allowed only when explicitly declared, which supports practical nested organisms without abandoning the hierarchy.
+
+Atomic tier and product ownership are separate axes. A fleet can keep shared foundations and components beside product-specific ones without inventing new Atomic tiers. Optional contract groups organize both Foundations and Composition in the Storybook projection; the first matching rule owns an item and everything unmatched remains in the shared folder.
+
+```toml
+[groups]
+shared_label = "Shared"
+
+[[groups.foundations]]
+label = "Storefront"
+include = ["color.product.storefront.*", "motion.storefront.*"]
+
+[[groups.composition]]
+label = "Storefront"
+include = ["storefront-*"]
+
+[[groups.composition]]
+label = "Operations"
+include = ["operations-*", "admin-*"]
+```
+
+Patterns accept exact paths, path prefixes, and `*` globs. A foundation category can therefore be split across multiple ownership folders while keeping one canonical DTCG document. Inherited organization-level groups merge with app-local groups, so the same organization is visible consistently across a multi-app fleet.
 
 ## Values, not just names
 

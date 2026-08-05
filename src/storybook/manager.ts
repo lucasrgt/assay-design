@@ -5,6 +5,7 @@ import { addons, types, useAddonState, useChannel, useGlobals, useStorybookApi, 
 import { type StorybookTheme, useTheme } from 'storybook/theming';
 import { projectAdvancedInspection, type AdvancedInspection } from './advanced.js';
 import { FoundationPreview, foundationGroups, foundationSelection, selectedFoundation } from './foundations.js';
+import { compositionFolders, effectiveGroups, groupedFoundations } from './grouping.js';
 import { AtomIcon, AtomicNavigation } from './atomic-navigation.js';
 import { COMPOSITION_VIEW, displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, pageBackedImplementations, pageSelection, selectedPage, selectionOwnsStory } from './atomic-navigation-model.js';
 import { CoverageView } from './coverage.js';
@@ -205,7 +206,8 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   };
   React.useEffect(() => { inspectorRef.current?.querySelectorAll('iframe').forEach(syncFrame); }, [advanced, name, payload.contract.tokens]);
   const foundation = selectedFoundation(name);
-  const foundationGroup = foundation ? foundationGroups(payload.contract).find((group) => group.id === foundation) : undefined;
+  const grouped = groupedFoundations(payload.contract, effectiveGroups(payload)).flatMap((folder) => folder.foundations);
+  const foundationGroup = foundation ? (grouped.length ? grouped.find((group) => group.selectionKey === foundation) : foundationGroups(payload.contract).find((group) => group.id === foundation)) : undefined;
   if (foundationGroup) return element('aside', { ref: inspectorRef, style: styles.inspector }, element(FoundationPreview, { group: foundationGroup }));
   if (foundation) return element('aside', { ref: inspectorRef, style: styles.inspector }, element(EmptyTabContent, { title: 'Foundation is not available in this contract' }));
   if (name === COMPOSITION_VIEW) return element('aside', { ref: inspectorRef, className: 'assay-scrollbar', style: { ...styles.inspector, padding: 14, overflowY: 'auto' } }, element(Composition, { payload, onSelect }));
@@ -319,17 +321,21 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
 
 function Composition({ payload, onSelect }: { payload: DesignPanelPayload; onSelect(name: string): void }) {
   const parents = payload.contract.components.filter((component) => component.parts.length);
+  const folders = compositionFolders(parents, effectiveGroups(payload));
+  const scopes = folders.length ? folders : [{ label: '', components: parents }];
   const components = new Map(payload.contract.components.map((component) => [component.name, component]));
   const observed = new Map<string, number>();
   for (const node of payload.evidence.nodes) observed.set(node.component, (observed.get(node.component) ?? 0) + 1);
   const compositionTiers: Tier[] = ['molecule', 'organism', 'template'];
   return element('div', null,
     element('header', { style: styles.compositionHeader }, element('h2', { style: { margin: 0, color: 'var(--ad-text)', fontSize: 16, fontWeight: 700 } }, 'Composition'), element(Badge, { compact: true, status: 'neutral' }, `${parents.reduce((sum, item) => sum + item.parts.length, 0)} direct relationships`)),
-    ...(parents.length ? compositionTiers.flatMap((tier) => {
-      const members = parents.filter((component) => component.tier === tier);
+    ...(parents.length ? scopes.flatMap((scope) => [
+      ...(scope.label ? [element('div', { key: `folder:${scope.label}`, style: { margin: '14px 0 7px', color: 'var(--ad-muted)', fontSize: 11, fontWeight: 700 } }, scope.label)] : []),
+      ...compositionTiers.flatMap((tier) => {
+      const members = scope.components.filter((component) => component.tier === tier);
       if (!members.length) return [];
       const TierIcon = tierIcons[tier];
-      return [element('section', { key: tier, style: styles.compositionTier },
+      return [element('section', { key: `${scope.label}:${tier}`, style: styles.compositionTier },
         element('div', { style: styles.compositionTierHeader }, element(TierIcon, { style: { ...(tier === 'atom' ? styles.atomIcon : styles.treeIcon), color: tierColors[tier] } }), element('span', null, `${displayName(tier)}s`), element(Badge, { compact: true, status: 'neutral' }, members.length)),
         element('div', { style: styles.compositionGrid }, ...members.map((component) => element('article', { key: component.name, style: styles.compositionCard },
           element(Button, { variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelect(component.name), style: styles.compositionParent },
@@ -349,7 +355,7 @@ function Composition({ payload, onSelect }: { payload: DesignPanelPayload; onSel
           })),
         ))),
       )];
-    }) : [element(EmptyTabContent, { key: 'empty', title: 'No component composition declared' })]),
+    })]) : [element(EmptyTabContent, { key: 'empty', title: 'No component composition declared' })]),
   );
 }
 
@@ -370,10 +376,13 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const [tab, setTab] = React.useState<Tab>('inventory');
   const mapped = React.useMemo(() => mappedComponentNames(payload), [payload]);
   const inspectable = React.useMemo(() => inspectableComponentNames(payload), [payload]);
-  const foundations = React.useMemo(() => foundationGroups(payload.contract), [payload]);
+  const foundations = React.useMemo(() => groupedFoundations(payload.contract, effectiveGroups(payload)).flatMap((folder) => folder.foundations), [payload]);
+  const flatFoundations = React.useMemo(() => foundations.length ? foundations : foundationGroups(payload.contract), [foundations, payload]);
   const pageEntries = React.useMemo(() => mappedPages(payload), [payload]);
   const mappedPageNames = React.useMemo(() => new Set(pageEntries.map((page) => page.name)), [pageEntries]);
-  const firstInspectable = payload.contract.components.find((component) => inspectable.has(component.name))?.name ?? (foundations[0] ? foundationSelection(foundations[0].id) : pageEntries[0] ? pageSelection(pageEntries[0].name) : COMPOSITION_VIEW);
+  const firstFoundation = flatFoundations[0];
+  const firstFoundationKey = firstFoundation && 'selectionKey' in firstFoundation ? String(firstFoundation.selectionKey) : firstFoundation?.id;
+  const firstInspectable = payload.contract.components.find((component) => inspectable.has(component.name))?.name ?? (firstFoundationKey ? foundationSelection(firstFoundationKey) : pageEntries[0] ? pageSelection(pageEntries[0].name) : COMPOSITION_VIEW);
   const activeComponent = Object.entries(payload.stories).find(([, story]) => implementationsOf(story).some((implementation) => implementation.id === storyId))?.[0];
   const activePage = Object.entries(payload.pages ?? {}).find(([, story]) => implementationsOf(story).some((implementation) => implementation.id === storyId))?.[0];
   const activeSelection = activeComponent ?? (activePage ? pageSelection(activePage) : undefined);
@@ -397,7 +406,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   const findings = findingsOf(payload);
   const missingStories = payload.contract.components.length - mapped.size;
   const tabs: [Tab, string, number][] = [
-    ['inventory', 'Atomic View', inspectable.size + foundations.length + pageEntries.length],
+    ['inventory', 'Atomic View', inspectable.size + flatFoundations.length + pageEntries.length],
     ['coverage', 'Coverage', missingStories],
     ['violations', 'Violations', findings.length],
   ];

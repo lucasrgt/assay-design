@@ -1,7 +1,7 @@
 import { collectDocument, verifyEvidence, type DesignContract } from '../index.js';
-import { REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryControls, type DesignStoryMap } from './shared.js';
+import { REQUEST_EVENT, VERDICT_EVENT, type DesignGroups, type DesignPanelPayload, type DesignStoryControls, type DesignStoryMap } from './shared.js';
 export { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT } from './shared.js';
-export type { DesignPanelPayload, DesignStoryControls, DesignStoryImplementation, DesignStoryMap, DesignStoryReference, StoryArgs } from './shared.js';
+export type { DesignGroups, DesignGroupRule, DesignPanelPayload, DesignStoryControls, DesignStoryImplementation, DesignStoryMap, DesignStoryReference, StoryArgs } from './shared.js';
 
 type Channel = {
   emit(event: string, payload?: unknown): void;
@@ -25,9 +25,9 @@ export async function evaluateStory(contract: DesignContract, surface: string, c
   return verifyEvidence(contract, collectDocument(document, surface, coverage));
 }
 
-export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}, pages: DesignStoryMap = {}): Promise<DesignPanelPayload> {
+export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}, pages: DesignStoryMap = {}, groups?: Partial<DesignGroups>): Promise<DesignPanelPayload> {
   const evidence = collectDocument(document, surface, coverage);
-  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, pages, controls };
+  return { ...await verifyEvidence(contract, evidence), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, groups: contract.groups, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, pages, controls, ...(groups ? { groups } : {}) };
 }
 
 export function publishStoryPanel(channel: Channel, evaluate: () => Promise<DesignPanelPayload>) {
@@ -43,9 +43,9 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
 export default {
   decorators: [
     (Story: () => unknown, context: { parameters: Record<string, unknown> }, suppliedChannel?: Channel) => {
-      const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: DesignStoryMap; pages?: DesignStoryMap; controls?: Record<string, DesignStoryControls> } | undefined;
+      const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: DesignStoryMap; pages?: DesignStoryMap; controls?: Record<string, DesignStoryControls>; groups?: Partial<DesignGroups> } | undefined;
       const channel = suppliedChannel ?? (globalThis as StorybookPreviewGlobal).__STORYBOOK_MODULE_PREVIEW_API__?.addons?.getChannel();
-      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls, settings.pages));
+      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls, settings.pages, settings.groups));
       return Story();
     },
   ],

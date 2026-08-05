@@ -6,6 +6,8 @@ export type { DesignTokenMeta } from './tokens.js';
 
 type Dict = Record<string, unknown>;
 export type Tier = 'atom' | 'molecule' | 'organism' | 'template';
+export type DesignGroupRule = { label: string; include: string[] };
+export type DesignGroups = { sharedLabel: string; foundations: DesignGroupRule[]; composition: DesignGroupRule[] };
 export interface StyleBinding { property: string; tokens: string[]; variant?: string; appearance?: string; state?: string; role?: string; slot?: string }
 export type FindingCategory = 'components' | 'properties' | 'composition' | 'semantics' | 'coverage' | 'tokens' | 'scale' | 'coherence';
 export interface ComponentContract {
@@ -16,7 +18,7 @@ export interface SurfaceContract { name: string; template?: string; requiredComp
 export interface DesignContract {
   schema: 1; name: string; extends: string[]; tokenFiles: string[]; components: ComponentContract[]; surfaces: SurfaceContract[];
   icons: Record<string, string[]>; policies: { maxPrimaryActionsPerRegion: number; buttonLabelPattern?: string; maxHeadingJump: number; requireIconIntent: boolean };
-  links: Record<string, string[]>; scales: Record<string, string[]>; extensionPoints: string[]; tokens?: Record<string, string>; tokenMeta?: Record<string, DesignTokenMeta>;
+  links: Record<string, string[]>; scales: Record<string, string[]>; extensionPoints: string[]; groups: DesignGroups; tokens?: Record<string, string>; tokenMeta?: Record<string, DesignTokenMeta>;
 }
 /** One lossy, ephemeral fact emitted by an adapter for linting. It is not a UI model or codegen input. */
 export interface StyleDeclaration {
@@ -54,9 +56,18 @@ const defaultScales: Record<string, string[]> = {
   space: ['padding', 'margin', 'gap', 'inset', 'top', 'right', 'bottom', 'left'], radius: ['border-radius'], fontSize: ['font-size'],
   motion: ['transition', 'transition-duration', 'animation-duration'], color: ['color', 'background', 'border', 'outline', 'fill', 'stroke'],
 };
-type ContractDeclarations = { policies: string[]; scales: string[] };
+const designGroups = (value: unknown): DesignGroups => {
+  const groups = value === undefined ? {} : record(value, 'groups');
+  const rules = (key: 'foundations' | 'composition'): DesignGroupRule[] => {
+    const rows = groups[key] ?? [];
+    if (!Array.isArray(rows)) throw new Error(`groups.${key} must be an array of tables`);
+    return rows.map((value, index) => { const row = record(value, `groups.${key}[${index}]`); return { label: text(row.label, `groups.${key}[${index}].label`), include: strings(row.include, `groups.${key}[${index}].include`) }; });
+  };
+  return { sharedLabel: optionalText(groups.shared_label, 'groups.shared_label') ?? 'Shared', foundations: rules('foundations'), composition: rules('composition') };
+};
+type ContractDeclarations = { policies: string[]; scales: string[]; groups: boolean };
 const contractDeclarations = new WeakMap<DesignContract, ContractDeclarations>();
-const declarationsOf = (contract: DesignContract): ContractDeclarations => contractDeclarations.get(contract) ?? { policies: Object.keys(contract.policies), scales: Object.keys(contract.scales) };
+const declarationsOf = (contract: DesignContract): ContractDeclarations => contractDeclarations.get(contract) ?? { policies: Object.keys(contract.policies), scales: Object.keys(contract.scales), groups: true };
 
 export function parseContract(source: string, tokenDocuments: readonly unknown[] = []): DesignContract {
   const raw = record(parse(source), 'contract');
@@ -108,11 +119,11 @@ export function parseContract(source: string, tokenDocuments: readonly unknown[]
     ['require_icon_intent', 'requireIconIntent'],
   ].filter(([source]) => source! in policies).map(([, target]) => target!);
   const contract: DesignContract = {
-    schema: 1, name: text(raw.name, 'name'), extends: extendsFrom, tokenFiles: strings(raw.token_files, 'token_files'), components, surfaces, icons, links, scales, extensionPoints: strings(inheritance.extension_points, 'inheritance.extension_points'),
+    schema: 1, name: text(raw.name, 'name'), extends: extendsFrom, tokenFiles: strings(raw.token_files, 'token_files'), components, surfaces, icons, links, scales, groups: designGroups(raw.groups), extensionPoints: strings(inheritance.extension_points, 'inheritance.extension_points'),
     policies: { maxPrimaryActionsPerRegion, maxHeadingJump, requireIconIntent: policies.require_icon_intent !== false, ...(buttonLabelPattern ? { buttonLabelPattern } : {}) },
   };
   if (tokenDocuments.length) Object.assign(contract, flattenTokenDocuments(tokenDocuments));
-  contractDeclarations.set(contract, { policies: declaredPolicies, scales: raw.scales === undefined ? [] : Object.keys(scales) });
+  contractDeclarations.set(contract, { policies: declaredPolicies, scales: raw.scales === undefined ? [] : Object.keys(scales), groups: raw.groups !== undefined });
   if (!extendsFrom.length) assertComposition(contract);
   return contract;
 }
@@ -188,6 +199,11 @@ export function mergeContracts(base: DesignContract, overlay: DesignContract, ex
     policies: { ...base.policies, ...policies } as DesignContract['policies'],
     links: Object.fromEntries([...new Set([...Object.keys(base.links), ...Object.keys(overlay.links)])].map((key) => [key, [...new Set([...(base.links[key] ?? []), ...(overlay.links[key] ?? [])])]])),
     scales: { ...base.scales, ...scales } as Record<string, string[]>,
+    groups: {
+      sharedLabel: overlayDeclarations.groups ? overlay.groups.sharedLabel : base.groups.sharedLabel,
+      foundations: [...base.groups.foundations, ...overlay.groups.foundations],
+      composition: [...base.groups.composition, ...overlay.groups.composition],
+    },
     extensionPoints: [...new Set([...base.extensionPoints, ...overlay.extensionPoints])],
     tokens: { ...base.tokens, ...overlay.tokens },
     tokenMeta: { ...base.tokenMeta, ...overlay.tokenMeta },
@@ -195,6 +211,7 @@ export function mergeContracts(base: DesignContract, overlay: DesignContract, ex
   contractDeclarations.set(merged, {
     policies: [...new Set([...baseDeclarations.policies, ...overlayDeclarations.policies])],
     scales: [...new Set([...baseDeclarations.scales, ...overlayDeclarations.scales])],
+    groups: baseDeclarations.groups || overlayDeclarations.groups,
   });
   return merged;
 }
@@ -364,7 +381,7 @@ export function designContext(contract: DesignContract) {
   const root = `design://contract/${encodeURIComponent(contract.name)}`;
   return {
     schema: 1,
-    contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, policies: contract.policies, scales: contract.scales, tokens: contract.tokens ?? contract.tokenFiles },
+    contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, policies: contract.policies, scales: contract.scales, groups: contract.groups, tokens: contract.tokens ?? contract.tokenFiles },
     graph: {
       nodes: [{ uri: root, kind: 'design-contract' }, ...contract.components.map((item) => ({ uri: `design://component/${encodeURIComponent(item.name)}`, kind: item.tier }))],
       edges: [...contract.components.map((item) => ({ from: root, relation: 'contains', to: `design://component/${encodeURIComponent(item.name)}` })), ...contract.components.flatMap((item) => item.parts.map((part) => ({ from: `design://component/${encodeURIComponent(item.name)}`, relation: 'composes', to: `design://component/${encodeURIComponent(part)}` }))), ...Object.entries(contract.links).flatMap(([relation, targets]) => targets.map((to) => ({ from: root, relation, to })))],
