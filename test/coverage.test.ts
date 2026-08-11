@@ -13,6 +13,7 @@ describe('Storybook coverage projection', () => {
     } as unknown as DesignPanelPayload;
     const snapshot = coverageSnapshot(payload);
     expect(snapshot.mappedComponents.has('card')).toBe(true);
+    expect(snapshot.mappedComponents.has('shell')).toBe(true);
     expect(snapshot.mappedPageNames.has('dashboard')).toBe(true);
     expect(snapshot.current?.name).toBe('dashboard');
     expect(snapshot.current?.required.some((item) => item.name === 'shell')).toBe(true);

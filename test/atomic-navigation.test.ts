@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedPages, navigationMatches, pageBackedImplementations, pageHierarchy, pageSelection, selectedPage, selectionOwnsStory } from '../src/storybook/atomic-navigation-model.js';
+import { displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, navigationMatches, pageBackedImplementations, pageHierarchy, pageSelection, selectedPage, selectionOwnsStory } from '../src/storybook/atomic-navigation-model.js';
 import type { DesignPanelPayload } from '../src/storybook/shared.js';
 import { contract, evidence } from './fixtures.js';
 
@@ -51,5 +51,20 @@ describe('Atomic View navigation', () => {
     expect(implementationsForSelection(shared, 'shell')[0]?.id).toBe('pages-dashboard--default');
     expect(selectionOwnsStory(shared, 'shell', 'pages-dashboard--default')).toBe(true);
     expect(selectionOwnsStory(shared, pageSelection('dashboard'), 'pages-dashboard--default')).toBe(true);
+  });
+
+  it('combines canonical and page-backed template implementations without duplicates', () => {
+    const shared = payload();
+    shared.stories.shell = [
+      { id: 'templates-shell--base', label: 'Template base', controls: { states: { default: { disabled: false } } } },
+      { id: 'pages-dashboard--default', label: 'Duplicate dashboard', controls: { states: { default: { disabled: true } } } },
+    ];
+    shared.pages!.dashboard = { id: 'pages-dashboard--default', label: 'React Native Web', platform: 'react-native-web' };
+
+    expect(implementationsForSelection(shared, 'shell')).toEqual([
+      { id: 'templates-shell--base', label: 'Template base', controls: { states: { default: { disabled: false } } } },
+      { id: 'pages-dashboard--default', label: 'React Native Web', platform: 'react-native-web', controls: { states: { default: { disabled: true } } } },
+    ]);
+    expect(mappedComponentNames(shared).has('shell')).toBe(true);
   });
 });

@@ -64,14 +64,14 @@ export function CoverageView({ payload, onSelect }: { payload: DesignPanelPayloa
     element('div', { style: styles.layout },
       element('main', { style: styles.primary },
         element('section', { style: styles.section },
-          element('div', { style: styles.sectionHeader }, element('span', { style: styles.sectionIdentity }, element(ComponentIcon, { style: { width: 13, height: 13, color: 'var(--ad-accent)' } }), element('h3', { style: styles.sectionTitle }, 'Canonical stories')), element('span', { style: styles.detail }, 'Select a component to inspect it')),
+          element('div', { style: styles.sectionHeader }, element('span', { style: styles.sectionIdentity }, element(ComponentIcon, { style: { width: 13, height: 13, color: 'var(--ad-accent)' } }), element('h3', { style: styles.sectionTitle }, 'Implementations')), element('span', { style: styles.detail }, 'Select a component to inspect it')),
           element('div', { style: styles.tierGrid }, ...componentGroups.map(({ tier, items }) => {
             const mapped = items.filter((component) => snapshot.mappedComponents.has(component.name)).length;
             return element('article', { key: tier, style: styles.tierCard },
               element('header', { style: styles.tierHeader }, element('span', { style: styles.tierName }, tierIcon(tier), `${displayName(tier)}s`), element(Badge, { compact: true, status: mapped === items.length ? 'positive' : 'neutral' }, `${mapped}/${items.length}`)),
               element('div', { style: styles.componentList }, ...items.map((component) => {
                 const mappedStory = snapshot.mappedComponents.has(component.name);
-                return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelect(component.name), style: styles.componentRow }, statusIcon(mappedStory), element('span', { style: styles.name }, displayName(component.name)), element(Badge, { compact: true, status: mappedStory ? 'positive' : 'negative' }, mappedStory ? 'Story mapped' : 'No canonical story'));
+                return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelect(component.name), style: styles.componentRow }, statusIcon(mappedStory), element('span', { style: styles.name }, displayName(component.name)), element(Badge, { compact: true, status: mappedStory ? 'positive' : 'negative' }, mappedStory ? 'Implementation mapped' : 'No implementation'));
               })),
             );
           })),

@@ -6,22 +6,27 @@ export const pageSelection = (name: string) => `${PAGE_PREFIX}${name}`;
 export const selectedPage = (selection: string) => selection.startsWith(PAGE_PREFIX) ? selection.slice(PAGE_PREFIX.length) : undefined;
 export const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
 export const implementationsOf = (reference?: DesignStoryReference): DesignStoryImplementation[] => !reference ? [] : typeof reference === 'string' ? [{ id: reference, label: 'Canonical' }] : Array.isArray(reference) ? [...reference] : [reference as DesignStoryImplementation];
-export const mappedComponentNames = (payload: DesignPanelPayload) => new Set(Object.entries(payload.stories).flatMap(([name, reference]) => implementationsOf(reference).length ? [name] : []));
 export const pageBackedImplementations = (payload: DesignPanelPayload, component: string) => payload.contract.surfaces
   .filter((surface) => surface.template === component)
   .flatMap((surface) => implementationsOf(payload.pages?.[surface.name]));
+const uniqueImplementations = (canonical: readonly DesignStoryImplementation[], pageBacked: readonly DesignStoryImplementation[]) => {
+  const implementations = new Map(canonical.map((implementation) => [implementation.id, implementation]));
+  for (const implementation of pageBacked) {
+    const existing = implementations.get(implementation.id);
+    implementations.set(implementation.id, existing ? { ...existing, ...implementation, ...(existing.controls ? { controls: existing.controls } : {}) } : implementation);
+  }
+  return [...implementations.values()];
+};
 export const implementationsForSelection = (payload: DesignPanelPayload, selection: string) => {
   const page = selectedPage(selection);
   if (page) return implementationsOf(payload.pages?.[page]);
   const canonical = implementationsOf(payload.stories[selection]);
-  return canonical.length ? canonical : pageBackedImplementations(payload, selection);
+  const component = payload.contract.components.find((item) => item.name === selection);
+  return component?.tier === 'template' ? uniqueImplementations(canonical, pageBackedImplementations(payload, selection)) : canonical;
 };
 export const selectionOwnsStory = (payload: DesignPanelPayload, selection: string, storyId?: string) => Boolean(storyId && implementationsForSelection(payload, selection).some((implementation) => implementation.id === storyId));
-export const inspectableComponentNames = (payload: DesignPanelPayload) => {
-  const names = mappedComponentNames(payload);
-  for (const component of payload.contract.components) if (component.tier === 'template' && pageBackedImplementations(payload, component.name).length) names.add(component.name);
-  return names;
-};
+export const mappedComponentNames = (payload: DesignPanelPayload) => new Set(payload.contract.components.filter((component) => implementationsForSelection(payload, component.name).length).map((component) => component.name));
+export const inspectableComponentNames = mappedComponentNames;
 
 export type DesignPage = { name: string; label: string; path: string[] };
 export type DesignPageFolder = { name: string; key: string; folders: DesignPageFolder[]; pages: DesignPage[] };

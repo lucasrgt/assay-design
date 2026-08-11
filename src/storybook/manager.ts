@@ -7,7 +7,7 @@ import { projectAdvancedInspection, type AdvancedInspection } from './advanced.j
 import { FoundationPreview, foundationGroups, foundationSelection, selectedFoundation } from './foundations.js';
 import { compositionFolders, effectiveGroups, groupedFoundations } from './grouping.js';
 import { AtomIcon, AtomicNavigation } from './atomic-navigation.js';
-import { COMPOSITION_VIEW, displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, pageBackedImplementations, pageSelection, selectedPage, selectionOwnsStory } from './atomic-navigation-model.js';
+import { COMPOSITION_VIEW, displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, pageSelection, selectedPage, selectionOwnsStory } from './atomic-navigation-model.js';
 import { CoverageView } from './coverage.js';
 import { DevicePreviewFrame } from './device-preview.js';
 import { mobileViewport } from './device-preview-model.js';
@@ -226,8 +226,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
     );
   }
   const component = payload.contract.components.find((item) => item.name === name);
-  const canonicalImplementations = implementationsOf(payload.stories[name]);
-  const implementations = canonicalImplementations.length ? canonicalImplementations : pageBackedImplementations(payload, name);
+  const implementations = implementationsForSelection(payload, name);
   const implementation = implementations.find((item) => item.id === storyId) ?? implementations[0];
   if (!component) return element('aside', { ref: inspectorRef, style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
   const widths = component.inlineSizing ? [component.inlineSizing, ...(component.allowFullWidth && component.inlineSizing !== 'full' ? ['full'] : [])] : [];
@@ -313,7 +312,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
               element(InspectionFacts, { facts: inspections.$single }),
             )
             : mobile ? element(DevicePreviewFrame, { title: `${component.name} canonical story`, src: currentPreview.source, inspectionKey: '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget) }) : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.preview })
-        : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No canonical story mapped', description: 'Map the component to a Storybook story to inspect its rendered implementation.' })),
+        : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No implementation mapped', description: 'Map the component or a page using this template to a Storybook story.' })),
       !comparisonFrames.length && currentPreview.story && !advanced ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(currentPreview.story)}${currentPreview.query ? `&args=${encodeURIComponent(currentPreview.query)}` : ''}${currentPreview.globals ? `&globals=${encodeURIComponent(currentPreview.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
   );
