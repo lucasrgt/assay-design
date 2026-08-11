@@ -1,19 +1,29 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { parseContract } from '../src/index.js';
 
+export const implementationPlatforms = [
+  { id: 'web', label: 'DOM' },
+  { id: 'react-native-web', label: 'React Native Web' },
+] as const;
+
+const implementations = (name: string) => implementationPlatforms.map((platform) => ({
+  id: `assay-design-canonical-components--${name}-${platform.id === 'web' ? 'dom' : 'native-web'}`,
+  platform: platform.id,
+}));
+
 export const canonicalStories = {
   button: [
-    { id: 'assay-design-canonical-components--button-dom', label: 'DOM', platform: 'web' },
-    { id: 'assay-design-canonical-components--button-native-web', label: 'RN Web', platform: 'react-native-web' },
+    { id: 'assay-design-canonical-components--button-dom', platform: 'web' },
+    { id: 'assay-design-canonical-components--button-native-web', platform: 'react-native-web' },
   ],
-  text: 'assay-design-canonical-components--text',
-  badge: 'assay-design-canonical-components--badge',
-  metric: 'assay-design-canonical-components--metric',
-  'search-field': 'assay-design-canonical-components--search-field',
-  card: 'assay-design-canonical-components--card',
-  navigation: 'assay-design-canonical-components--navigation',
-  'dashboard-grid': 'assay-design-canonical-components--dashboard-grid',
-  'application-shell': 'assay-design-canonical-components--application-shell',
+  text: implementations('text'),
+  badge: implementations('badge'),
+  metric: implementations('metric'),
+  'search-field': implementations('search-field'),
+  card: implementations('card'),
+  navigation: implementations('navigation'),
+  'dashboard-grid': implementations('dashboard-grid'),
+  'application-shell': implementations('application-shell'),
 };
 
 export const canonicalControls = {
@@ -201,6 +211,7 @@ const meta = {
       contract: showcaseContract,
       surface: 'design-overview',
       stories: canonicalStories,
+      implementationPlatforms,
       controls: canonicalControls,
       coverage: { states: ['default'], themes: ['dark'], viewports: ['desktop'], locales: ['en'] },
     },
@@ -213,5 +224,5 @@ type Story = StoryObj<typeof meta>;
 export const Conformant: Story = {};
 export const Inconsistent: Story = {
   args: { inconsistent: true },
-  parameters: { designHarness: { contract: showcaseContract, surface: 'design-overview', stories: canonicalStories, controls: canonicalControls, coverage: { states: ['default'], themes: [], viewports: [], locales: ['en'] } } },
+  parameters: { designHarness: { contract: showcaseContract, surface: 'design-overview', stories: canonicalStories, implementationPlatforms, controls: canonicalControls, coverage: { states: ['default'], themes: [], viewports: [], locales: ['en'] } } },
 };

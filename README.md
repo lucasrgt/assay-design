@@ -192,15 +192,22 @@ export const Default = {
       surface: 'dashboard',
       stories: {
         button: [
-          { id: 'design-system-atoms-button--dom', label: 'DOM', platform: 'web' },
-          { id: 'design-system-atoms-button--rn-web', label: 'RN Web', platform: 'react-native-web' },
+          { id: 'design-system-atoms-button--dom', platform: 'web' },
+          { id: 'design-system-atoms-button--rn-web', platform: 'react-native-web' },
         ],
-        card: 'design-system-molecules-card--default',
+        card: [
+          { id: 'design-system-molecules-card--dom', platform: 'web' },
+          { id: 'design-system-molecules-card--rn-web', platform: 'react-native-web' },
+        ],
       },
       pages: {
         dashboard: 'product-pages-dashboard--default',
         profile: { id: 'product-pages-profile--default', label: 'Profile', path: 'Account/Settings' },
       },
+      implementationPlatforms: [
+        { id: 'web', label: 'DOM' },
+        { id: 'react-native-web', label: 'React Native Web' },
+      ],
       controls: {
         button: {
           variants: { primary: { variant: 'primary' }, secondary: { variant: 'secondary' } },
@@ -214,7 +221,7 @@ export const Default = {
 };
 ```
 
-The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. A component may map to one story or to several named platform implementations; the inspector switches between them without changing the governing contract. Templates follow one uniform rule: the inspector combines their directly mapped canonical stories with every mapped page whose surface declares that template, deduplicating repeated story IDs. Implementation entries may also carry their own `controls` when adapters expose different Storybook args. Page entries accept an optional `label` and slash-delimited or array `path`; the Atomic View renders those paths as collapsible folders while plain string mappings remain valid. Its search filters foundations, composition, components, pages, and page-folder ancestry. Explicit controls bind contract variants, data states, and width modes to real args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
+The addon never constructs a component from the contract: its inspector opens the mapped story, so the rendered subject is always the project's real implementation. `implementationPlatforms` declares the renderer matrix once; every atom, molecule, organism, and template must map exactly one story for each platform. The harness normalizes platform order and labels, reports incomplete mappings as AVP failures, and keeps product pages in the separate `pages` coverage axis instead of treating them as implementations. Implementation entries may also carry their own `controls` when adapters expose different Storybook args. Page entries accept an optional `label` and slash-delimited or array `path`; the Atomic View renders those paths as collapsible folders. Its search filters foundations, composition, components, pages, and page-folder ancestry. Explicit controls bind contract variants, data states, and width modes to real args. CSS interaction states named `hover`, `active`/`pressed`, `focus`, `focus-visible`, or `focus-within` are frozen through Storybook's pseudo-state preview integration without requiring an args mapping. Those badges become interactive, while parts and slots remain structural information. The addon is optional; Assay Design does not install or replace Storybook.
 
 The repository includes a runnable showcase with conformant and intentionally inconsistent stories:
 

@@ -8,23 +8,25 @@ describe('Storybook coverage projection', () => {
     const payload = {
       outcome: 'pass', results: [], contract: contract(),
       evidence: { ...evidence(), coverage: { states: ['default'], themes: ['dark'], viewports: [], locales: [] } },
-      stories: { card: 'components-card--default' },
+      implementationPlatforms: [{ id: 'web', label: 'DOM' }, { id: 'react-native-web', label: 'React Native Web' }],
+      stories: { card: [{ id: 'components-card--dom', platform: 'web' }, { id: 'components-card--native', platform: 'react-native-web' }] },
       pages: { dashboard: { id: 'pages-dashboard--default', path: 'Product/Home' } },
     } as unknown as DesignPanelPayload;
     const snapshot = coverageSnapshot(payload);
     expect(snapshot.mappedComponents.has('card')).toBe(true);
-    expect(snapshot.mappedComponents.has('shell')).toBe(true);
+    expect(snapshot.mappedComponents.has('shell')).toBe(false);
     expect(snapshot.mappedPageNames.has('dashboard')).toBe(true);
     expect(snapshot.current?.name).toBe('dashboard');
     expect(snapshot.current?.required.some((item) => item.name === 'shell')).toBe(true);
     expect(snapshot.current?.axes.states.observed).toEqual(['default']);
-    expect(snapshot.missingComponents.some((item) => item.name === 'button')).toBe(true);
+    expect(snapshot.missingComponents.map((item) => item.name)).toEqual(expect.arrayContaining(['button', 'shell']));
   });
 
   it('keeps declared surfaces distinct when no rendered surface is active', () => {
     const payload = {
       outcome: 'pass', results: [], contract: contract(),
       evidence: { ...evidence(), surface: 'other', nodes: [], coverage: undefined },
+      implementationPlatforms: [{ id: 'web', label: 'DOM' }],
       stories: {}, pages: {},
     } as unknown as DesignPanelPayload;
     const snapshot = coverageSnapshot(payload);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import showcaseMeta, { ContractStory, showcaseContract } from '../demo/DesignHarness.stories.js';
+import showcaseMeta, { ContractStory, implementationPlatforms, showcaseContract } from '../demo/DesignHarness.stories.js';
 import { evaluateStoryPanel, publishStoryPanel, REQUEST_EVENT, VERDICT_EVENT } from '../src/storybook/preview.js';
 
 const coverage = { states: ['default'], themes: ['dark'], viewports: ['desktop'], locales: ['en'] };
@@ -11,16 +11,23 @@ describe('Storybook workbench showcase', () => {
 
   it('derives a green inventory from the conformant rendered story', async () => {
     document.body.innerHTML = renderToStaticMarkup(React.createElement(ContractStory));
-    const payload = await evaluateStoryPanel(showcaseContract, 'design-overview', coverage, showcaseMeta.parameters.designHarness.stories, showcaseMeta.parameters.designHarness.controls);
+    const payload = await evaluateStoryPanel(showcaseContract, 'design-overview', coverage, showcaseMeta.parameters.designHarness.stories, showcaseMeta.parameters.designHarness.controls, {}, undefined, implementationPlatforms);
     expect(payload.outcome).toBe('pass');
     expect(payload.contract.components).toHaveLength(9);
     expect(Object.keys(payload.stories)).toHaveLength(9);
-    expect(payload.stories.button).toEqual([
-      expect.objectContaining({ label: 'DOM', platform: 'web' }),
-      expect.objectContaining({ label: 'RN Web', platform: 'react-native-web' }),
-    ]);
+    expect(payload.implementationPlatforms).toEqual(implementationPlatforms);
+    expect(Object.values(payload.stories).every((reference) => Array.isArray(reference) && reference.length === 2)).toBe(true);
     expect(payload.controls).toMatchObject({ button: { states: { disabled: { state: 'disabled' } }, widths: { full: { width: 'full' } } } });
     expect(new Set(payload.evidence.nodes.map((node) => node.component))).toEqual(new Set(payload.contract.components.map((component) => component.name)));
+  });
+
+  it('fails closed when any component is missing a platform implementation', async () => {
+    document.body.innerHTML = renderToStaticMarkup(React.createElement(ContractStory));
+    const stories = { ...showcaseMeta.parameters.designHarness.stories, text: [{ id: 'text--dom', platform: 'web' }] };
+    const payload = await evaluateStoryPanel(showcaseContract, 'design-overview', coverage, stories, {}, {}, undefined, implementationPlatforms);
+    const rules = (payload.results as unknown as readonly { evidence?: { rule: string; path: string }[] }[]).flatMap((result) => result.evidence ?? []);
+    expect(payload.outcome).toBe('fail');
+    expect(rules).toContainEqual(expect.objectContaining({ rule: 'storybook/implementation-platform', path: 'stories.text' }));
   });
 
   it('exposes independent structural, policy, token, and coverage violations', async () => {

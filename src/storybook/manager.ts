@@ -312,7 +312,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
               element(InspectionFacts, { facts: inspections.$single }),
             )
             : mobile ? element(DevicePreviewFrame, { title: `${component.name} canonical story`, src: currentPreview.source, inspectionKey: '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget) }) : element('iframe', { title: `${component.name} canonical story`, src: currentPreview.source, scrolling: 'auto', 'data-inspection-key': '$single', onLoad: (event: React.SyntheticEvent<HTMLIFrameElement>) => syncFrame(event.currentTarget), style: styles.preview })
-        : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No implementation mapped', description: 'Map the component or a page using this template to a Storybook story.' })),
+        : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No implementation mapped', description: 'Map one Storybook story for each declared implementation platform.' })),
       !comparisonFrames.length && currentPreview.story && !advanced ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', ariaLabel: 'Open in canvas', asChild: true, style: styles.previewAction }, element('a', { href: `?path=/story/${encodeURIComponent(currentPreview.story)}${currentPreview.query ? `&args=${encodeURIComponent(currentPreview.query)}` : ''}${currentPreview.globals ? `&globals=${encodeURIComponent(currentPreview.globals)}` : ''}`, target: '_top', title: 'Open in canvas' }, element(ExpandAltIcon))) : null,
     ),
   );
@@ -429,7 +429,7 @@ const normalizePayload = (value: unknown): DesignPanelPayload | undefined => {
   if (!value || typeof value !== 'object') return undefined;
   const payload = value as DesignPanelPayload;
   if (!payload.contract || !Array.isArray(payload.contract.components) || !Array.isArray(payload.contract.surfaces)) return undefined;
-  return { ...payload, contract: { ...payload.contract, groups: effectiveGroups(payload) } };
+  return { ...payload, implementationPlatforms: payload.implementationPlatforms ?? [], contract: { ...payload.contract, groups: effectiveGroups(payload) } };
 };
 const cachePayload = (value: unknown) => {
   const payload = normalizePayload(value);

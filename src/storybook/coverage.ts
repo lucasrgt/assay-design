@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserIcon, ComponentIcon, DocumentIcon, GridIcon, StatusFailIcon, StatusPassIcon } from '@storybook/icons';
 import { Badge, Button, EmptyTabContent } from 'storybook/internal/components';
 import { AtomIcon } from './atomic-navigation.js';
-import { displayName, pageSelection } from './atomic-navigation-model.js';
+import { displayName, implementationStatus, pageSelection } from './atomic-navigation-model.js';
 import { coverageAxes, coverageSnapshot } from './coverage-model.js';
 import type { DesignPanelPayload } from './shared.js';
 
@@ -70,8 +70,8 @@ export function CoverageView({ payload, onSelect }: { payload: DesignPanelPayloa
             return element('article', { key: tier, style: styles.tierCard },
               element('header', { style: styles.tierHeader }, element('span', { style: styles.tierName }, tierIcon(tier), `${displayName(tier)}s`), element(Badge, { compact: true, status: mapped === items.length ? 'positive' : 'neutral' }, `${mapped}/${items.length}`)),
               element('div', { style: styles.componentList }, ...items.map((component) => {
-                const mappedStory = snapshot.mappedComponents.has(component.name);
-                return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelect(component.name), style: styles.componentRow }, statusIcon(mappedStory), element('span', { style: styles.name }, displayName(component.name)), element(Badge, { compact: true, status: mappedStory ? 'positive' : 'negative' }, mappedStory ? 'Implementation mapped' : 'No implementation'));
+                const status = implementationStatus(payload, component.name);
+                return element(Button, { key: component.name, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelect(component.name), style: styles.componentRow }, statusIcon(status.complete), element('span', { style: styles.name }, displayName(component.name)), element(Badge, { compact: true, status: status.complete ? 'positive' : 'negative' }, `${status.required.length - status.missing.length}/${status.required.length} platforms`));
               })),
             );
           })),

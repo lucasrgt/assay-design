@@ -1,4 +1,4 @@
-import type { DesignPanelPayload, DesignStoryImplementation, DesignStoryReference } from './shared.js';
+import type { DesignImplementationPlatform, DesignPanelPayload, DesignStoryImplementation, DesignStoryReference } from './shared.js';
 
 export const COMPOSITION_VIEW = '$composition';
 const PAGE_PREFIX = '$page:';
@@ -6,26 +6,46 @@ export const pageSelection = (name: string) => `${PAGE_PREFIX}${name}`;
 export const selectedPage = (selection: string) => selection.startsWith(PAGE_PREFIX) ? selection.slice(PAGE_PREFIX.length) : undefined;
 export const displayName = (name: string) => name.split('-').map((part) => part ? `${part[0]!.toUpperCase()}${part.slice(1)}` : part).join(' ');
 export const implementationsOf = (reference?: DesignStoryReference): DesignStoryImplementation[] => !reference ? [] : typeof reference === 'string' ? [{ id: reference, label: 'Canonical' }] : Array.isArray(reference) ? [...reference] : [reference as DesignStoryImplementation];
-export const pageBackedImplementations = (payload: DesignPanelPayload, component: string) => payload.contract.surfaces
-  .filter((surface) => surface.template === component)
-  .flatMap((surface) => implementationsOf(payload.pages?.[surface.name]));
-const uniqueImplementations = (canonical: readonly DesignStoryImplementation[], pageBacked: readonly DesignStoryImplementation[]) => {
-  const implementations = new Map(canonical.map((implementation) => [implementation.id, implementation]));
-  for (const implementation of pageBacked) {
-    const existing = implementations.get(implementation.id);
-    implementations.set(implementation.id, existing ? { ...existing, ...implementation, ...(existing.controls ? { controls: existing.controls } : {}) } : implementation);
-  }
-  return [...implementations.values()];
+const platformOrder = (platforms: readonly DesignImplementationPlatform[], platform?: string) => {
+  const index = platforms.findIndex((item) => item.id === platform);
+  return index < 0 ? platforms.length : index;
 };
+const normalizedImplementations = (reference: DesignStoryReference | undefined, platforms: readonly DesignImplementationPlatform[]) => implementationsOf(reference)
+  .map((implementation) => {
+    const platform = platforms.find((item) => item.id === implementation.platform);
+    return platform ? { ...implementation, label: platform.label } : implementation;
+  })
+  .sort((left, right) => platformOrder(platforms, left.platform) - platformOrder(platforms, right.platform));
 export const implementationsForSelection = (payload: DesignPanelPayload, selection: string) => {
   const page = selectedPage(selection);
   if (page) return implementationsOf(payload.pages?.[page]);
-  const canonical = implementationsOf(payload.stories[selection]);
-  const component = payload.contract.components.find((item) => item.name === selection);
-  return component?.tier === 'template' ? uniqueImplementations(canonical, pageBackedImplementations(payload, selection)) : canonical;
+  return normalizedImplementations(payload.stories[selection], payload.implementationPlatforms);
 };
 export const selectionOwnsStory = (payload: DesignPanelPayload, selection: string, storyId?: string) => Boolean(storyId && implementationsForSelection(payload, selection).some((implementation) => implementation.id === storyId));
-export const mappedComponentNames = (payload: DesignPanelPayload) => new Set(payload.contract.components.filter((component) => implementationsForSelection(payload, component.name).length).map((component) => component.name));
+export const implementationStatus = (payload: DesignPanelPayload, component: string) => {
+  const implementations = implementationsOf(payload.stories[component]);
+  const required = payload.implementationPlatforms;
+  const missing = required.filter((platform) => implementations.filter((item) => item.platform === platform.id).length !== 1);
+  const unexpected = implementations.filter((item) => !item.platform || !required.some((platform) => platform.id === item.platform));
+  return { implementations, required, missing, unexpected, complete: required.length > 0 && missing.length === 0 && unexpected.length === 0 };
+};
+export const implementationMatrixFindings = (payload: Pick<DesignPanelPayload, 'contract' | 'stories' | 'implementationPlatforms'>) => {
+  const findings: { rule: string; category: 'coverage'; path: string; message: string }[] = [];
+  const platformIds = payload.implementationPlatforms.map((platform) => platform.id);
+  const duplicatePlatforms = [...new Set(platformIds.filter((platform, index) => platformIds.indexOf(platform) !== index))];
+  if (!payload.implementationPlatforms.length) findings.push({ rule: 'storybook/implementation-platforms', category: 'coverage', path: 'implementationPlatforms', message: 'Declare the implementation platform matrix once for the harness' });
+  for (const platform of duplicatePlatforms) findings.push({ rule: 'storybook/implementation-platforms', category: 'coverage', path: 'implementationPlatforms', message: `Platform "${platform}" is declared more than once` });
+  for (const component of payload.contract.components) {
+    const implementations = implementationsOf(payload.stories[component.name]);
+    for (const platform of payload.implementationPlatforms) {
+      const count = implementations.filter((implementation) => implementation.platform === platform.id).length;
+      if (count !== 1) findings.push({ rule: 'storybook/implementation-platform', category: 'coverage', path: `stories.${component.name}`, message: count === 0 ? `Missing ${platform.label} implementation` : `${platform.label} is mapped ${count} times` });
+    }
+    for (const implementation of implementations.filter((item) => !item.platform || !platformIds.includes(item.platform))) findings.push({ rule: 'storybook/implementation-platform', category: 'coverage', path: `stories.${component.name}`, message: implementation.platform ? `Implementation "${implementation.id}" uses undeclared platform "${implementation.platform}"` : `Implementation "${implementation.id}" has no platform` });
+  }
+  return findings;
+};
+export const mappedComponentNames = (payload: DesignPanelPayload) => new Set(payload.contract.components.filter((component) => implementationStatus(payload, component.name).complete).map((component) => component.name));
 export const inspectableComponentNames = mappedComponentNames;
 
 export type DesignPage = { name: string; label: string; path: string[] };
