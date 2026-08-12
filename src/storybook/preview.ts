@@ -18,10 +18,11 @@ type StorybookPreviewGlobal = typeof globalThis & {
 let connectedChannel: Channel | undefined;
 let emitLatest: (() => void) | undefined;
 const answerRequest = () => emitLatest?.();
-const afterStoryPaint = () => {
-  if (typeof requestAnimationFrame !== 'function') return setTimeout(answerRequest);
-  requestAnimationFrame(() => requestAnimationFrame(answerRequest));
+const afterStoryPaint = (callback: () => void = answerRequest) => {
+  if (typeof requestAnimationFrame !== 'function') return setTimeout(callback);
+  requestAnimationFrame(() => requestAnimationFrame(callback));
 };
+const maxEmptyEvidenceRetries = 8;
 
 export async function evaluateStory(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2]) {
   return verifyEvidence(contract, collectDocument(document, surface, coverage));
@@ -46,7 +47,15 @@ export async function evaluateStoryPanel(contract: DesignContract, surface: stri
 }
 
 export function publishStoryPanel(channel: Channel, evaluate: () => Promise<DesignPanelPayload>) {
-  emitLatest = () => { void evaluate().then((payload) => channel.emit(VERDICT_EVENT, payload)); };
+  const evaluateAfterPaint = async (attempt = 0): Promise<void> => {
+    const payload = await evaluate();
+    if (!payload.evidence.nodes.length && attempt < maxEmptyEvidenceRetries) {
+      afterStoryPaint(() => { void evaluateAfterPaint(attempt + 1); });
+      return;
+    }
+    channel.emit(VERDICT_EVENT, payload);
+  };
+  emitLatest = () => { void evaluateAfterPaint(); };
   if (connectedChannel !== channel) {
     connectedChannel?.off(REQUEST_EVENT, answerRequest);
     connectedChannel = channel;

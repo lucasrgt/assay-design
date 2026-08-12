@@ -60,12 +60,33 @@ describe('Storybook workbench showcase', () => {
         for (const listener of listeners.get(event) ?? []) listener();
       },
     };
-    const payload = { outcome: 'pass' } as never;
+    const payload = { outcome: 'pass', evidence: { nodes: [{}] } } as never;
     publishStoryPanel(channel, async () => payload);
     await vi.runAllTimersAsync();
     verdicts.length = 0;
     channel.emit(REQUEST_EVENT);
     await Promise.resolve();
     expect(verdicts).toEqual([payload]);
+  });
+
+  it('does not publish transient empty evidence while the story is still mounting', async () => {
+    vi.useFakeTimers();
+    const verdicts: unknown[] = [];
+    const channel = {
+      on: () => undefined,
+      off: () => undefined,
+      emit: (event: string, payload?: unknown) => { if (event === VERDICT_EVENT) verdicts.push(payload); },
+    };
+    let evaluations = 0;
+    const finalPayload = { outcome: 'pass', evidence: { nodes: [{ component: 'button' }] } };
+    publishStoryPanel(channel, async () => {
+      evaluations += 1;
+      return (evaluations < 3 ? { outcome: 'fail', evidence: { nodes: [] } } : finalPayload) as never;
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(evaluations).toBe(3);
+    expect(verdicts).toEqual([finalPayload]);
   });
 });
