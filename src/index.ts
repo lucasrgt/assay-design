@@ -336,7 +336,8 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
     const parentStyle = element.parentElement && view?.getComputedStyle(element.parentElement);
     const pixels = (raw?: string) => Number.parseFloat(raw || '0') || 0;
     const parentPadding = pixels(parentStyle?.paddingLeft) + pixels(parentStyle?.paddingRight);
-    const containerInlineSize = container?.width ? Math.max(0, container.width - parentPadding) : 0;
+    const parentBorder = pixels(parentStyle?.borderLeftWidth) + pixels(parentStyle?.borderRightWidth);
+    const containerInlineSize = container?.width ? Math.max(0, container.width - parentPadding - parentBorder) : 0;
     const cssFull = style?.width === '100%' || Boolean(element.getAttribute('style')?.match(/(?:^|;)\s*width\s*:\s*100%\s*(?:;|$)/i));
     const widthMode = box.width > 0 && containerInlineSize > 0 ? (Math.abs(box.width - containerInlineSize) <= 1 ? 'full' : 'bounded') : cssFull ? 'full' : undefined;
     return { component, ...(variant ? { variant } : {}), ...(appearance ? { appearance } : {}), ...(state ? { state } : {}), ...(role ? { role } : {}), ...(action ? { action } : {}), ...(icon ? { icon } : {}), ...(iconIntent ? { iconIntent } : {}), ...(element.textContent?.trim() ? { text: element.textContent.trim() } : {}), ...(regionName ? { region: regionName } : {}), ...(headingLevel ? { headingLevel } : {}), ...(tokens?.length ? { tokens } : {}), ...(slots.length ? { slots } : {}), ...(parentIndex !== undefined ? { parent: parentIndex } : {}), ...(widthFlag ? { widthFlag } : {}), ...(widthMode ? { widthMode } : {}), ...(box.width > 0 ? { inlineSize: box.width } : {}), ...(containerInlineSize > 0 ? { containerInlineSize } : {}) };
@@ -366,7 +367,11 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
       }).filter((color) => color && !['transparent', 'rgba(0, 0, 0, 0)'].includes(color)))];
       if (borderColors.length === 1) rows.push(['border-color', borderColors[0]!]);
       else borderColors.forEach((color, edge) => rows.push([`border-${edge}-color`, color]));
-      for (const property of ['min-height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'] as const) rows.push([property, computed.getPropertyValue(property)]);
+      for (const property of ['min-height', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'] as const) {
+        const value = computed.getPropertyValue(property);
+        const normalized = property === 'min-height' && (value === 'auto' || /^0(?:px|rem|em)?$/.test(value)) ? '0px' : value;
+        rows.push([property, normalized]);
+      }
       const radii = (['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const).map((corner) => computed.getPropertyValue(`border-${corner}-radius`));
       if (computed.borderRadius) rows.push(['border-radius', computed.borderRadius]);
       else if (radii.every((radius) => radius === radii[0])) rows.push(['border-radius', radii[0]!]);

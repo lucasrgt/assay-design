@@ -189,13 +189,13 @@ describe('evidence', () => {
   });
 
   it('requires container-filling components to declare a sanctioned full-width exception', () => {
-    document.body.innerHTML = `<div id="region"><button data-ds="button" data-variant="secondary"><span data-ds-slot="label">Continue</span></button></div>`;
+    document.body.innerHTML = `<div id="region" style="padding: 0 28px; border: 1px solid transparent"><button data-ds="button" data-variant="secondary"><span data-ds-slot="label">Continue</span></button></div>`;
     const region = document.querySelector('#region')!;
     const button = document.querySelector('button')!;
     Object.defineProperty(region, 'getBoundingClientRect', { value: () => ({ width: 400 }) });
-    Object.defineProperty(button, 'getBoundingClientRect', { value: () => ({ width: 400 }) });
+    Object.defineProperty(button, 'getBoundingClientRect', { value: () => ({ width: 342 }) });
     const implicit = collectDocument(button, 'dashboard');
-    expect(implicit.nodes[0]).toMatchObject({ component: 'button', widthMode: 'full', inlineSize: 400, containerInlineSize: 400 });
+    expect(implicit.nodes[0]).toMatchObject({ component: 'button', widthMode: 'full', inlineSize: 342, containerInlineSize: 342 });
     expect(inspectEvidence(contract(), implicit)).toEqual(expect.arrayContaining([
       expect.objectContaining({ rule: 'coherence/inline-sizing', category: 'coherence' }),
     ]));
@@ -207,6 +207,14 @@ describe('evidence', () => {
     expect(inspectEvidence(forbidden, collectDocument(button, 'dashboard'))).toEqual(expect.arrayContaining([
       expect.objectContaining({ rule: 'component/full-width-not-allowed', category: 'properties' }),
     ]));
+  });
+
+  it('normalizes the default flex min-height before comparing component styles', () => {
+    document.body.innerHTML = `<div><span data-ui="text" data-role="caption" style="min-height:auto">One</span><span data-ui="text" data-role="caption" style="min-height:0">Two</span></div>`;
+    const evidence = collectDocument(document, 'dashboard');
+    const minHeights = evidence.styles?.filter((item) => item.property === 'min-height').map((item) => item.value);
+    expect(minHeights).toEqual(['0px', '0px']);
+    expect(inspectEvidence(contract(), evidence).some((finding) => finding.rule === 'coherence/property-drift' && finding.path.includes('min-height'))).toBe(false);
   });
 
   it('rejects rendered component geometry and elevation outside semantic bindings', () => {
