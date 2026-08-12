@@ -46,7 +46,7 @@ export const implementationMatrixFindings = (payload: Pick<DesignPanelPayload, '
   return findings;
 };
 export const mappedComponentNames = (payload: DesignPanelPayload) => new Set(payload.contract.components.filter((component) => implementationStatus(payload, component.name).complete).map((component) => component.name));
-export const inspectableComponentNames = mappedComponentNames;
+export const inspectableComponentNames = (payload: Pick<DesignPanelPayload, 'contract'>) => new Set(payload.contract.components.map((component) => component.name));
 
 export type DesignPage = { name: string; label: string; path: string[] };
 export type DesignPageFolder = { name: string; key: string; folders: DesignPageFolder[]; pages: DesignPage[] };

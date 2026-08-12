@@ -1,6 +1,6 @@
 {
   "name": "assay-design",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Cross-framework linter for design-system, Atomic Design, screen, and multi-app consistency.",
   "type": "module",
   "license": "MIT",

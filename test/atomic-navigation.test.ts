@@ -42,7 +42,16 @@ describe('Atomic View navigation', () => {
     expect(navigationMatches('TRAVEL', 'Traveler')).toBe(true);
     expect(pageHierarchy(payload(), 'traveler')?.folders[0]?.folders[0]?.pages[0]?.label).toBe('Overview');
     expect(pageHierarchy(payload(), 'missing')).toBeUndefined();
-    expect(inspectableComponentNames(payload()).has('shell')).toBe(false);
+    expect(inspectableComponentNames(payload()).has('shell')).toBe(true);
+    expect(mappedComponentNames(payload()).has('shell')).toBe(false);
+  });
+
+  it('keeps every contract component inspectable while implementations are missing or stale', () => {
+    const stale = payload();
+    stale.implementationPlatforms = [];
+
+    expect([...inspectableComponentNames(stale)]).toEqual(stale.contract.components.map((component) => component.name));
+    expect(mappedComponentNames(stale).size).toBe(0);
   });
 
   it('keeps pages separate from component implementations', () => {
