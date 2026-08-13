@@ -13,7 +13,7 @@ The three design surfaces have deliberately different jobs:
 ## Start
 
 ```sh
-npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.7.1/assay-design-0.7.1.tgz
+npm install -D https://github.com/lucasrgt/assay-design/releases/download/v0.7.2/assay-design-0.7.2.tgz
 npx assay-design init
 npx assay-design doctor
 npx assay-design context
