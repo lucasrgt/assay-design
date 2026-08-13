@@ -351,7 +351,8 @@ export function collectDocument(root: ParentNode, surface: string, coverage?: De
     return targets.flatMap((target): StyleDeclaration[] => {
       const view = target.ownerDocument.defaultView;
       const computed = view?.getComputedStyle(target);
-      if (!computed) return [];
+      if (!view || !computed) return [];
+      if (/jsdom/i.test(view.navigator.userAgent) && !target.getAttribute('style')?.trim()) return [];
       const slot = target.getAttribute('data-ds-slot') ?? target.getAttribute('data-ui-slot');
       const subject = `${component}${slot ? `.slot.${slot}` : ''}`;
       const origin = `dom:${surface} ${subject}`;

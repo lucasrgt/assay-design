@@ -142,6 +142,23 @@ describe('evidence', () => {
     expect(collectDocument(button, 'dashboard').nodes[0]).toMatchObject({ component: 'button', icon: 'plus', iconIntent: 'add' });
   });
 
+  it('does not report synthetic DOM user-agent defaults as authored design', () => {
+    document.body.innerHTML = '<h2 data-ui="text">Unstyled title</h2>';
+    const rendered = collectDocument(document, 'dashboard');
+    expect(rendered.styles ?? []).toEqual([]);
+    expect(inspectEvidence(contract(), rendered).some((finding) => ['tokens/unbound-color', 'tokens/off-scale-one-off'].includes(finding.rule))).toBe(false);
+    document.body.innerHTML = '<span data-ui="text" style="color:#2563eb">Inline token color</span>';
+    expect(collectDocument(document, 'dashboard').styles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ property: 'color', value: 'rgb(37, 99, 235)' }),
+    ]));
+    document.body.innerHTML = '<button data-ui="button" style="padding:8px;border:1px solid #2563eb;font:700 16px/20px sans-serif">Create</button>';
+    expect(collectDocument(document, 'dashboard').styles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ property: 'padding-top', value: '8px' }),
+      expect.objectContaining({ property: 'border-color', value: 'rgb(37, 99, 235)' }),
+      expect.objectContaining({ property: 'font-size', value: '16px' }),
+    ]));
+  });
+
   it('rejects rendered colors that match no design token', () => {
     document.body.innerHTML = `<span data-ui="text" style="color: #2563eb">Token color</span>`;
     const aligned = collectDocument(document, 'dashboard');
