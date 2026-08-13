@@ -18,24 +18,31 @@ const layer = (document: Document, root: HTMLElement, styles: Partial<CSSStyleDe
   return node;
 };
 
-export function projectAdvancedInspection(frame: HTMLIFrameElement, component: string, enabled: boolean, tokens: Record<string, string> = {}, palette: InspectionPalette, onInspect?: (facts: AdvancedInspection[]) => void, tokenMeta: Record<string, { type?: string }> = {}, parts: readonly string[] = []) {
+type InspectionFocus = { owner: string; path: readonly string[] };
+const directChildren = (owner: HTMLElement, name: string) => [...owner.querySelectorAll<HTMLElement>('[data-ds],[data-ui]')]
+  .filter((node) => (node.dataset.ds ?? node.dataset.ui) === name && node.parentElement?.closest('[data-ds],[data-ui]') === owner);
+
+export function projectAdvancedInspection(frame: HTMLIFrameElement, component: string, enabled: boolean, tokens: Record<string, string> = {}, palette: InspectionPalette, onInspect?: (facts: AdvancedInspection[]) => void, tokenMeta: Record<string, { type?: string }> = {}, parts: readonly string[] = [], focus?: InspectionFocus) {
   cleanups.get(frame)?.();
   cleanups.delete(frame);
-  if (!enabled) { onInspect?.([]); return; }
+  if (!enabled && !focus) { onInspect?.([]); return; }
   try {
     const view = frame.contentWindow;
     const document = frame.contentDocument;
     if (!view || !document?.body) return;
     const selector = '[data-ds],[data-ui]';
-    const roots = [...document.querySelectorAll<HTMLElement>(selector)].filter((node) => (node.dataset.ds ?? node.dataset.ui) === component);
+    const ownerRoots = focus ? [...document.querySelectorAll<HTMLElement>(selector)].filter((node) => (node.dataset.ds ?? node.dataset.ui) === focus.owner) : [];
+    const roots = focus ? focus.path.reduce<HTMLElement[]>((owners, name) => owners.flatMap((owner) => directChildren(owner, name)), ownerRoots) : [...document.querySelectorAll<HTMLElement>(selector)].filter((node) => (node.dataset.ds ?? node.dataset.ui) === component);
     if (!roots.length) {
       onInspect?.([]);
       const Observer = (view as unknown as { MutationObserver?: typeof MutationObserver }).MutationObserver ?? MutationObserver;
       const observer = new Observer(() => {
-        const mounted = [...document.querySelectorAll<HTMLElement>('[data-ds],[data-ui]')].some((node) => (node.dataset.ds ?? node.dataset.ui) === component);
+        const mounted = focus
+          ? focus.path.reduce<HTMLElement[]>((owners, name) => owners.flatMap((owner) => directChildren(owner, name)), [...document.querySelectorAll<HTMLElement>(selector)].filter((node) => (node.dataset.ds ?? node.dataset.ui) === focus.owner)).length > 0
+          : [...document.querySelectorAll<HTMLElement>(selector)].some((node) => (node.dataset.ds ?? node.dataset.ui) === component);
         if (!mounted) return;
         observer.disconnect();
-        if (cleanups.get(frame) === cleanup) projectAdvancedInspection(frame, component, true, tokens, palette, onInspect, tokenMeta, parts);
+        if (cleanups.get(frame) === cleanup) projectAdvancedInspection(frame, component, enabled, tokens, palette, onInspect, tokenMeta, parts, focus);
       });
       const cleanup = () => observer.disconnect();
       cleanups.set(frame, cleanup);
@@ -70,6 +77,27 @@ export function projectAdvancedInspection(frame: HTMLIFrameElement, component: s
     };
     const spacing = entries.filter(([name]) => /space|spacing/.test(name.toLowerCase())).map(([, value]) => number(value)).filter((value) => value >= 2).sort((a, b) => a - b)[0] ?? 4;
     const tag = (text: string, left: number, top: number, color: string) => layer(document, root, { position: 'fixed', left: `${left}px`, top: `${top}px`, padding: '1px 4px', borderRadius: '3px', color: palette.panel, background: color, fontWeight: '700', whiteSpace: 'nowrap' }, text);
+    if (!enabled) {
+      const drawFocus = () => {
+        root.replaceChildren();
+        for (const target of roots) {
+          const rect = target.getBoundingClientRect();
+          if (!rect.width || !rect.height) continue;
+          layer(document, root, { position: 'fixed', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, boxSizing: 'border-box', outline: `2px solid ${palette.accent}`, background: `color-mix(in srgb, ${palette.accent} 7%, transparent)` });
+          tag(`part · ${component}`, rect.left, Math.max(2, rect.top - 16), palette.accent);
+        }
+        onInspect?.([]);
+      };
+      roots[0]?.scrollIntoView({ block: 'center', inline: 'center' });
+      drawFocus();
+      const Observer = (view as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver ?? ResizeObserver;
+      const observer = new Observer(drawFocus);
+      roots.forEach((target) => observer.observe(target));
+      view.addEventListener('resize', drawFocus);
+      view.addEventListener('scroll', drawFocus, true);
+      cleanups.set(frame, () => { observer.disconnect(); view.removeEventListener('resize', drawFocus); view.removeEventListener('scroll', drawFocus, true); root.remove(); });
+      return;
+    }
     const band = (left: number, top: number, width: number, height: number, value: number, showLabel: boolean) => {
       if (width <= 0 || height <= 0) return;
       layer(document, root, { position: 'fixed', left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`, boxSizing: 'border-box', background: `color-mix(in srgb, ${palette.warning} 20%, transparent)`, border: `1px solid color-mix(in srgb, ${palette.warning} 38%, transparent)` });

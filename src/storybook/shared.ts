@@ -13,6 +13,7 @@ export type DesignStoryImplementation = { id: string; label?: string; platform?:
 export type DesignStoryReference = string | DesignStoryImplementation | readonly DesignStoryImplementation[];
 export type DesignStoryMap = Record<string, DesignStoryReference>;
 export type DesignPanelPayload = FeatureVerdict & {
+  storyId?: string;
   contract: Pick<DesignContract, 'name' | 'components' | 'surfaces' | 'tokens' | 'tokenMeta' | 'groups'>;
   evidence: DesignEvidence;
   stories: DesignStoryMap;

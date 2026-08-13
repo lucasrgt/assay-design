@@ -21,13 +21,13 @@ describe('Storybook workbench showcase', () => {
     expect(new Set(payload.evidence.nodes.map((node) => node.component))).toEqual(new Set(payload.contract.components.map((component) => component.name)));
   });
 
-  it('fails closed when any component is missing a platform implementation', async () => {
+  it('inherits part coverage but fails closed when a root component is missing a platform implementation', async () => {
     document.body.innerHTML = renderToStaticMarkup(React.createElement(ContractStory));
-    const stories = { ...showcaseMeta.parameters.designHarness.stories, text: [{ id: 'text--dom', platform: 'web' }] };
+    const stories = { ...showcaseMeta.parameters.designHarness.stories, 'application-shell': [{ id: 'shell--dom', platform: 'web' }] };
     const payload = await evaluateStoryPanel(showcaseContract, 'design-overview', coverage, stories, {}, {}, undefined, implementationPlatforms);
     const rules = (payload.results as unknown as readonly { evidence?: { rule: string; path: string }[] }[]).flatMap((result) => result.evidence ?? []);
     expect(payload.outcome).toBe('fail');
-    expect(rules).toContainEqual(expect.objectContaining({ rule: 'storybook/implementation-platform', path: 'stories.text' }));
+    expect(rules).toContainEqual(expect.objectContaining({ rule: 'storybook/implementation-platform', path: 'stories.application-shell' }));
   });
 
   it('exposes independent structural, policy, token, and coverage violations', async () => {

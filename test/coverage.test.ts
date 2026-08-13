@@ -19,7 +19,7 @@ describe('Storybook coverage projection', () => {
     expect(snapshot.current?.name).toBe('dashboard');
     expect(snapshot.current?.required.some((item) => item.name === 'shell')).toBe(true);
     expect(snapshot.current?.axes.states.observed).toEqual(['default']);
-    expect(snapshot.missingComponents.map((item) => item.name)).toEqual(expect.arrayContaining(['button', 'shell']));
+    expect(snapshot.missingComponents.map((item) => item.name)).toEqual(['shell']);
   });
 
   it('keeps declared surfaces distinct when no rendered surface is active', () => {

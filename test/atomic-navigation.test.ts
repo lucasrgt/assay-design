@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayName, implementationMatrixFindings, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, navigationMatches, pageHierarchy, pageSelection, selectedPage, selectionOwnsStory } from '../src/storybook/atomic-navigation-model.js';
+import { canonicalSelection, controlArgs, displayName, implementationMatrixFindings, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, navigationMatches, pageHierarchy, pageSelection, partSelection, selectedPage, selectedPart, selectionOwnsStory } from '../src/storybook/atomic-navigation-model.js';
 import type { DesignPanelPayload } from '../src/storybook/shared.js';
 import { contract, evidence } from './fixtures.js';
 
@@ -74,8 +74,48 @@ describe('Atomic View navigation', () => {
       { id: 'templates-shell--native', label: 'React Native Web', platform: 'react-native-web' },
     ]);
     expect(mappedComponentNames(shared).has('shell')).toBe(true);
-    expect(implementationMatrixFindings(shared)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: 'stories.button', message: 'Missing DOM implementation' }),
+    expect(implementationMatrixFindings(shared)).toEqual([]);
+    expect(mappedComponentNames(shared).has('button')).toBe(true);
+  });
+
+  it('inherits a part preview and platform coverage from its canonical parent', () => {
+    const shared = payload();
+    shared.stories.shell = [
+      { id: 'templates-shell--dom', platform: 'web' },
+      { id: 'templates-shell--native', platform: 'react-native-web' },
+    ];
+
+    const selection = canonicalSelection(shared, 'button');
+    expect(selectedPart(selection)).toEqual({ owner: 'shell', path: ['card', 'button'], component: 'button' });
+    expect(implementationsForSelection(shared, selection).map((item) => item.id)).toEqual(['templates-shell--dom', 'templates-shell--native']);
+    expect(selectionOwnsStory(shared, selection, 'templates-shell--dom')).toBe(true);
+    expect(partSelection(selection, 'label')).toContain('$part:shell:card/button/label');
+  });
+
+  it('merges viewport controls with component selections deterministically', () => {
+    expect(controlArgs({ viewports: { desktop: { layout: 'desktop' } }, variants: { primary: { kind: 'primary' } } }, { viewports: 'desktop', variants: 'primary' })).toEqual({ layout: 'desktop', kind: 'primary' });
+  });
+
+  it('keeps a mapped root as its own canonical selection', () => {
+    const shared = payload();
+    shared.stories.shell = [{ id: 'shell--dom', platform: 'web' }, { id: 'shell--native', platform: 'react-native-web' }];
+    expect(canonicalSelection(shared, 'shell')).toBe('shell');
+  });
+
+  it('keeps an unmapped orphan selectable when no canonical ancestor exists', () => {
+    expect(canonicalSelection(payload(), 'shell')).toBe('shell');
+  });
+
+  it('reports duplicate and undeclared platform mappings separately', () => {
+    const shared = payload();
+    shared.implementationPlatforms = [{ id: 'web', label: 'DOM' }, { id: 'web', label: 'DOM duplicate' }];
+    shared.stories.shell = [{ id: 'one', platform: 'web' }, { id: 'two', platform: 'web' }, { id: 'legacy' }, { id: 'ios', platform: 'ios' }];
+    const findings = implementationMatrixFindings(shared);
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'storybook/implementation-platforms', message: 'Platform "web" is declared more than once' }),
+      expect.objectContaining({ path: 'stories.shell', message: 'DOM is mapped 2 times' }),
+      expect.objectContaining({ path: 'stories.shell', message: 'Implementation "legacy" has no platform' }),
+      expect.objectContaining({ path: 'stories.shell', message: 'Implementation "ios" uses undeclared platform "ios"' }),
     ]));
   });
 });

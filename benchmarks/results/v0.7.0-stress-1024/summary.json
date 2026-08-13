@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "benchmark": "assay-design-multidomain-stress",
+  "version": "0.7.0",
+  "corpus": {
+    "subjects": 1024,
+    "domains": 8,
+    "corrected": 512,
+    "vulnerable": 512,
+    "avpCriterionVerdicts": 8192
+  },
+  "accuracy": {
+    "expectedFailures": 512,
+    "detectedFailures": 512,
+    "missedFailures": 0,
+    "falseAlarms": 0,
+    "unexpectedResults": 0
+  },
+  "determinism": {
+    "runs": 100,
+    "drift": 0
+  },
+  "scale": {
+    "nodes": 50000,
+    "findings": 0,
+    "durationMs": 32.48,
+    "nodesPerSecond": 1539228.78
+  },
+  "performance": {
+    "durationMs": 77.49,
+    "subjectsPerSecond": 13214.11,
+    "heapDeltaBytes": 9390664
+  },
+  "passed": true,
+  "limitations": [
+    "The corpus is deterministic and synthetic.",
+    "Timing is observational and is not a cross-machine pass threshold.",
+    "The stress test exercises lint evidence plus AVP verdict aggregation, not Figma or browser rendering latency."
+  ]
+}

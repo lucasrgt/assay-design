@@ -71,6 +71,21 @@ describe('advanced Storybook inspection', () => {
     expect(subject.document.querySelector('[data-assay-advanced]')?.textContent).not.toContain('part · icon');
   });
 
+  it('focuses a nested part inside the canonical parent without opening an isolated story', () => {
+    const subject = preview('<main data-ui="screen"><section data-ui="welcome-content"><div data-ui="welcome-message">Welcome</div></section></main><section data-ui="welcome-content">Unrelated</section>');
+    const content = subject.document.querySelector<HTMLElement>('main [data-ui="welcome-content"]')!;
+    vi.spyOn(content, 'getBoundingClientRect').mockReturnValue(box(32, 48, 280, 140));
+    Object.defineProperty(content, 'scrollIntoView', { configurable: true, value: vi.fn() });
+    const inspect = vi.fn();
+
+    projectAdvancedInspection(subject.frame, 'welcome-content', false, tokens, palette, inspect, {}, [], { owner: 'screen', path: ['welcome-content'] });
+
+    const overlay = subject.document.querySelector<HTMLElement>('[data-assay-advanced="welcome-content"]')!;
+    expect(overlay.textContent).toContain('part · welcome-content');
+    expect(overlay.querySelectorAll('div')).toHaveLength(2);
+    expect(inspect).toHaveBeenCalledWith([]);
+  });
+
   it('reports token-aligned values when space is constrained', () => {
     const subject = preview('<button data-ds="button" style="padding:8px;font-size:16px;line-height:20px;font-weight:400;border-radius:4px"></button>');
     const button = subject.document.querySelector<HTMLElement>('button')!;

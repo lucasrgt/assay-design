@@ -7,10 +7,11 @@ import { projectAdvancedInspection, type AdvancedInspection } from './advanced.j
 import { FoundationPreview, foundationGroups, foundationSelection, selectedFoundation } from './foundations.js';
 import { compositionFolders, effectiveGroups, groupedFoundations } from './grouping.js';
 import { AtomIcon, AtomicNavigation } from './atomic-navigation.js';
-import { COMPOSITION_VIEW, displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, pageSelection, selectedPage, selectionOwnsStory } from './atomic-navigation-model.js';
+import { canonicalSelection, COMPOSITION_VIEW, controlArgs, displayName, implementationsForSelection, implementationsOf, inspectableComponentNames, mappedComponentNames, mappedPages, pageSelection, partSelection, selectedComponent, selectedPage, selectedPart, selectionOwnsStory } from './atomic-navigation-model.js';
 import { CoverageView } from './coverage.js';
 import { DevicePreviewFrame } from './device-preview.js';
 import { mobileViewport } from './device-preview-model.js';
+import { partImplementationFindings } from './part-drift.js';
 import { ADDON_ID, REQUEST_EVENT, VERDICT_EVENT, type DesignPanelPayload, type DesignStoryImplementation } from './shared.js';
 
 const TAB_ID = `${ADDON_ID}/tab`;
@@ -187,7 +188,7 @@ function InspectionFacts({ facts, compact = false }: { facts: AdvancedInspection
   );
 }
 
-function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { payload: DesignPanelPayload; name: string; storyId?: string; onSelectStory(id: string): void; onSelect(name: string): void }) {
+function VisualInspector({ payload, name, storyId, onSelectStory, onSelect, onSelectPart }: { payload: DesignPanelPayload; name: string; storyId?: string; onSelectStory(id: string): void; onSelect(name: string): void; onSelectPart(owner: string, part: string): void }) {
   const [globals, updateGlobals] = useGlobals();
   const dark = globals.theme === 'dark';
   const [selections, setSelections] = React.useState<Record<string, Record<string, string>>>({});
@@ -199,10 +200,12 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   const theme = useTheme() as StorybookTheme;
   const mobile = viewport === 'mobile';
   const inspectionPalette = { accent: theme.fgColor.accent, agentic: theme.fgColor.agentic, positive: theme.fgColor.positive, warning: theme.fgColor.warning, panel: theme.background.app, text: theme.fgColor.default, muted: theme.fgColor.muted };
+  const partContext = selectedPart(name);
+  const componentName = selectedComponent(name);
   const syncFrame = (frame: HTMLIFrameElement) => {
     const key = frame.dataset.inspectionKey ?? '$single';
-    const parts = payload.contract.components.find((component) => component.name === name)?.parts ?? [];
-    projectAdvancedInspection(frame, name, advanced, payload.contract.tokens, inspectionPalette, (facts) => setInspections((current) => JSON.stringify(current[key]) === JSON.stringify(facts) ? current : { ...current, [key]: facts }), payload.contract.tokenMeta ?? {}, parts);
+    const parts = payload.contract.components.find((component) => component.name === componentName)?.parts ?? [];
+    projectAdvancedInspection(frame, componentName, advanced, payload.contract.tokens, inspectionPalette, (facts) => setInspections((current) => JSON.stringify(current[key]) === JSON.stringify(facts) ? current : { ...current, [key]: facts }), payload.contract.tokenMeta ?? {}, parts, partContext);
   };
   React.useEffect(() => { inspectorRef.current?.querySelectorAll('iframe').forEach(syncFrame); }, [advanced, name, payload.contract.tokens]);
   const foundation = selectedFoundation(name);
@@ -210,22 +213,24 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   const foundationGroup = foundation ? (grouped.length ? grouped.find((group) => group.selectionKey === foundation) : foundationGroups(payload.contract).find((group) => group.id === foundation)) : undefined;
   if (foundationGroup) return element('aside', { ref: inspectorRef, style: styles.inspector }, element(FoundationPreview, { group: foundationGroup }));
   if (foundation) return element('aside', { ref: inspectorRef, style: styles.inspector }, element(EmptyTabContent, { title: 'Foundation is not available in this contract' }));
-  if (name === COMPOSITION_VIEW) return element('aside', { ref: inspectorRef, className: 'assay-scrollbar', style: { ...styles.inspector, padding: 14, overflowY: 'auto' } }, element(Composition, { payload, onSelect }));
+  if (name === COMPOSITION_VIEW) return element('aside', { ref: inspectorRef, className: 'assay-scrollbar', style: { ...styles.inspector, padding: 14, overflowY: 'auto' } }, element(Composition, { payload, onSelect, onSelectPart }));
   const page = selectedPage(name);
   if (page) {
     const pageImplementation = implementationsOf(payload.pages?.[page])[0];
     const story = pageImplementation?.id;
     const pageLabel = pageImplementation?.label ?? displayName(page);
+    const pageQuery = argsQuery(controlArgs(pageImplementation?.controls ?? {}, { viewports: viewport }));
     const globals = `theme:${dark ? 'dark' : 'light'}`;
+    const pageSource = story ? `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false${pageQuery ? `&args=${encodeURIComponent(pageQuery)}` : ''}&globals=${encodeURIComponent(globals)}` : '';
     return element('aside', { ref: inspectorRef, style: styles.inspector },
       element('div', { style: styles.componentMeta }, element('span', { style: styles.componentMetaHeading },
         element('span', { style: styles.componentIdentity }, element('span', { style: styles.tierBadge }, element(BrowserIcon, { style: { ...styles.treeIcon, color: 'var(--ad-story)' } }), 'Page'), element('span', { style: styles.componentMetaTitle }, pageLabel)),
         element('span', { style: styles.componentMetaActions }, element(ViewportSwitch, { value: viewport, onChange: setViewport }), element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: dark, ariaLabel: dark ? 'Use light mode' : 'Use dark mode', title: dark ? 'Use light mode' : 'Use dark mode', onClick: () => updateGlobals({ theme: dark ? 'light' : 'dark' }), style: styles.comparisonAction }, dark ? element(SunIcon) : element(MoonIcon))),
       )),
-      story ? element('div', { style: styles.previewFrame }, mobile ? element(DevicePreviewFrame, { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}` }) : element('iframe', { title: `${page} page`, src: `iframe.html?id=${encodeURIComponent(story)}&viewMode=story&shortcuts=false&globals=${encodeURIComponent(globals)}`, scrolling: 'auto', style: styles.preview })) : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No page story mapped' })),
+      story ? element('div', { style: styles.previewFrame }, mobile ? element(DevicePreviewFrame, { title: `${page} page`, src: pageSource }) : element('iframe', { title: `${page} page`, src: pageSource, scrolling: 'auto', style: styles.preview })) : element('div', { style: styles.emptyPreview }, element(EmptyTabContent, { title: 'No page story mapped' })),
     );
   }
-  const component = payload.contract.components.find((item) => item.name === name);
+  const component = payload.contract.components.find((item) => item.name === componentName);
   const implementations = implementationsForSelection(payload, name);
   const implementation = implementations.find((item) => item.id === storyId) ?? implementations[0];
   if (!component) return element('aside', { ref: inspectorRef, style: styles.inspector }, element(EmptyTabContent, { title: 'Select a declared component' }));
@@ -234,7 +239,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   const visibleGroups = groups.filter(([, values]) => values.length);
   const groupValues = new Map(groups);
   const componentSelections = selections[name] ?? {};
-  const controls = implementation?.controls ?? payload.controls?.[name] ?? {};
+  const controls = implementation?.controls ?? payload.controls?.[component.name] ?? {};
   const mode = comparisonModes[name] ?? '';
   const toggleMode = (next: string) => setComparisonModes((current) => ({ ...current, [name]: current[name] === next ? '' : next }));
   const choose = (group: string, value: string) => {
@@ -245,9 +250,9 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   const canSelect = (sourceControls: typeof controls, group: string, value: string) => Boolean(sourceControls[group]?.[value] || group === 'states' && pseudoStateKeys[value]);
   const renderable = (group: string, values: readonly string[]) => values.filter((value) => canSelect(controls, group, value));
   const previewOf = (target = implementation, override: Record<string, string> = {}) => {
-    const targetControls = target?.controls ?? payload.controls?.[name] ?? {};
-    const selected = { ...componentSelections, ...override };
-    const args = Object.assign({}, ...Object.entries(targetControls).map(([group, values]) => values?.[selected[group] ?? groupValues.get(group)?.[0] ?? ''] ?? {}));
+    const targetControls = target?.controls ?? payload.controls?.[component.name] ?? {};
+    const selected: Record<string, string> = { ...componentSelections, viewports: viewport, ...override };
+    const args = controlArgs(targetControls, selected, Object.fromEntries(groupValues));
     const query = argsQuery(args);
     const pseudoState = pseudoStateKeys[selected.states ?? component.states[0] ?? ''];
     const globals = [`theme:${dark ? 'dark' : 'light'}`, pseudoState ? `pseudo.${pseudoState}:!true` : ''].filter(Boolean).join(';');
@@ -268,7 +273,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   return element('aside', { ref: inspectorRef, style: styles.inspector },
     element('div', { style: styles.componentMeta },
       element('span', { style: styles.componentMetaHeading },
-        element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
+        element('span', { style: styles.componentIdentity }, tierBadge(component.tier, true), partContext ? element('span', { style: styles.meta }, `${displayName(partContext.owner)} /`) : null, element('span', { style: styles.componentMetaTitle }, displayName(component.name))),
         element('span', { style: styles.componentMetaActions },
           element(ViewportSwitch, { value: viewport, onChange: setViewport }),
           element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: dark, ariaLabel: dark ? 'Use light mode' : 'Use dark mode', title: dark ? 'Use light mode' : 'Use dark mode', onClick: () => updateGlobals({ theme: dark ? 'light' : 'dark' }), style: styles.comparisonAction }, dark ? element(SunIcon) : element(MoonIcon)),
@@ -289,7 +294,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
         const groupStyle = { ...styles.componentMetaGroup, ...(label === 'states' ? { flex: '3 1 360px' } : label === 'variants' ? { flex: '2 1 260px' } : {}) };
         return element('span', { key: label, style: groupStyle },
           element('span', { style: styles.componentMetaGroupHeader }, element('span', { style: styles.componentMetaGroupLabel }, displayName(label)), !navigates && selectableValues.length > 1 ? element(IconButton, { variant: 'ghost', size: 'small', padding: 'small', active: mode === label, ariaLabel: mode === label ? `Return to one ${label}` : `Compare all ${label}`, title: mode === label ? 'Single preview' : `Compare all ${label}`, onClick: () => toggleMode(label), style: styles.comparisonAction }, element(SideBySideIcon)) : null),
-          element('span', { style: styles.componentMetaValues }, ...metadataChips(values, label, navigates ? undefined : selected, interactive ? (value) => navigates ? onSelect(value) : choose(label, value) : undefined, navigates ? () => true : (value) => canSelect(controls, label, value))),
+          element('span', { style: styles.componentMetaValues }, ...metadataChips(values, label, navigates ? undefined : selected, interactive ? (value) => navigates ? onSelectPart(name, value) : choose(label, value) : undefined, navigates ? () => true : (value) => canSelect(controls, label, value))),
         );
       })) : null,
     ),
@@ -318,7 +323,7 @@ function VisualInspector({ payload, name, storyId, onSelectStory, onSelect }: { 
   );
 }
 
-function Composition({ payload, onSelect }: { payload: DesignPanelPayload; onSelect(name: string): void }) {
+function Composition({ payload, onSelect, onSelectPart }: { payload: DesignPanelPayload; onSelect(name: string): void; onSelectPart(owner: string, part: string): void }) {
   const parents = payload.contract.components.filter((component) => component.parts.length);
   const folders = compositionFolders(parents, effectiveGroups(payload));
   const scopes = folders.length ? folders : [{ label: '', components: parents }];
@@ -345,7 +350,7 @@ function Composition({ payload, onSelect }: { payload: DesignPanelPayload; onSel
             const child = components.get(part);
             const childTier = child?.tier ?? 'atom';
             const ChildIcon = tierIcons[childTier];
-            return element(Button, { key: part, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelect(part), title: `Inspect ${displayName(part)}`, style: styles.compositionPart },
+            return element(Button, { key: part, variant: 'ghost', size: 'small', padding: 'none', ariaLabel: false, onClick: () => onSelectPart(component.name, part), title: `Inspect ${displayName(part)} inside ${displayName(component.name)}`, style: styles.compositionPart },
               element(ArrowRightIcon, { style: { ...styles.treeIcon, color: 'var(--ad-muted)' } }),
               element(ChildIcon, { style: { ...styles.treeIcon, color: tierColors[childTier] } }),
               element('span', { style: styles.inventoryName }, displayName(part)),
@@ -391,14 +396,22 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
   }, [activeSelection, api, storyId]);
   React.useEffect(() => {
     setSelected((current) => {
-      const valid = current === COMPOSITION_VIEW || Boolean(selectedFoundation(current)) || inspectable.has(current) || Boolean(selectedPage(current) && mappedPageNames.has(selectedPage(current)!));
+      const part = selectedPart(current);
+      const valid = current === COMPOSITION_VIEW || Boolean(selectedFoundation(current)) || inspectable.has(current) || Boolean(part && inspectable.has(part.owner) && inspectable.has(part.component)) || Boolean(selectedPage(current) && mappedPageNames.has(selectedPage(current)!));
       if (activeSelection && !selectionOwnsStory(payload, current, storyId)) return activeSelection;
       return valid ? current : firstInspectable;
     });
   }, [activeSelection, firstInspectable, inspectable, mappedPageNames, payload, storyId]);
   const selectComponent = (name: string) => {
-    setSelected(name);
-    const story = implementationsForSelection(payload, name)[0]?.id;
+    const selection = inspectable.has(name) ? canonicalSelection(payload, name) : name;
+    setSelected(selection);
+    const story = implementationsForSelection(payload, selection)[0]?.id;
+    if (story && story !== storyId) api.selectStory(story);
+  };
+  const selectPart = (owner: string, part: string) => {
+    const selection = partSelection(owner, part);
+    setSelected(selection);
+    const story = implementationsForSelection(payload, selection)[0]?.id;
     if (story && story !== storyId) api.selectStory(story);
   };
   const passing = payload.outcome === 'pass';
@@ -410,7 +423,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
     ['violations', 'Violations', findings.length],
   ];
   const content = tab === 'inventory'
-    ? element('div', { style: styles.workspace }, element('div', { className: 'assay-scrollbar', style: styles.inventory }, element(AtomicNavigation, { payload, selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected, storyId, onSelectStory: (id) => api.selectStory(id), onSelect: selectComponent }))
+    ? element('div', { style: styles.workspace }, element('div', { className: 'assay-scrollbar', style: styles.inventory }, element(AtomicNavigation, { payload, selected: selectedPart(selected)?.component ?? selected, onSelect: selectComponent })), element(VisualInspector, { payload, name: selected, storyId, onSelectStory: (id) => api.selectStory(id), onSelect: selectComponent, onSelectPart: selectPart }))
     : element('div', { className: 'assay-scrollbar', style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } }, tab === 'coverage' ? element(CoverageView, { payload, onSelect: selectComponent }) : element('div', { style: { padding: '14px 0 24px' } }, element(Violations, { payload })));
   return element('div', { style: { ...styles.root, ...themeVariables(theme as StorybookTheme) } },
     element('style', null, scrollbarCss),
@@ -424,6 +437,7 @@ function Workbench({ payload }: { payload: DesignPanelPayload }) {
 }
 
 let cachedPayload: DesignPanelPayload | undefined;
+const storyEvidence = new Map<string, DesignPanelPayload['evidence']>();
 const subscribers = new Set<(payload: DesignPanelPayload) => void>();
 const normalizePayload = (value: unknown): DesignPanelPayload | undefined => {
   if (!value || typeof value !== 'object') return undefined;
@@ -434,8 +448,11 @@ const normalizePayload = (value: unknown): DesignPanelPayload | undefined => {
 const cachePayload = (value: unknown) => {
   const payload = normalizePayload(value);
   if (!payload) return;
-  cachedPayload = payload;
-  for (const subscriber of subscribers) subscriber(payload);
+  if (payload.storyId) storyEvidence.set(payload.storyId, payload.evidence);
+  const drift = partImplementationFindings(payload, storyEvidence);
+  const visible: DesignPanelPayload = drift.length ? { ...payload, outcome: 'fail', results: [...payload.results, { criterionId: 'storybook.part-implementation-drift', status: 'fail', reason: 'An isolated part story diverges from its canonical parent instance', evidence: drift }] } : payload;
+  cachedPayload = visible;
+  for (const subscriber of subscribers) subscriber(visible);
 };
 
 function DesignPage() {

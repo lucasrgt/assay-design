@@ -39,11 +39,11 @@ const verifyImplementationMatrix = (contract: DesignContract, stories: DesignSto
   });
 };
 
-export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}, pages: DesignStoryMap = {}, groups?: Partial<DesignGroups>, implementationPlatforms: readonly DesignImplementationPlatform[] = []): Promise<DesignPanelPayload> {
+export async function evaluateStoryPanel(contract: DesignContract, surface: string, coverage?: Parameters<typeof collectDocument>[2], stories: DesignStoryMap = {}, controls: Record<string, DesignStoryControls> = {}, pages: DesignStoryMap = {}, groups?: Partial<DesignGroups>, implementationPlatforms: readonly DesignImplementationPlatform[] = [], storyId?: string): Promise<DesignPanelPayload> {
   const evidence = collectDocument(document, surface, coverage);
   const contractGroups = contract.groups ?? { sharedLabel: 'Shared', foundations: [], composition: [] };
   const verdict = composeVerdicts(surface, await Promise.all([verifyEvidence(contract, evidence), verifyImplementationMatrix(contract, stories, implementationPlatforms)]));
-  return { ...verdict, contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, groups: contractGroups, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, implementationPlatforms, pages, controls, ...(groups ? { groups } : {}) };
+  return { ...verdict, ...(storyId ? { storyId } : {}), contract: { name: contract.name, components: contract.components, surfaces: contract.surfaces, groups: contractGroups, ...(contract.tokens ? { tokens: contract.tokens } : {}), ...(contract.tokenMeta ? { tokenMeta: contract.tokenMeta } : {}) }, evidence, stories, implementationPlatforms, pages, controls, ...(groups ? { groups } : {}) };
 }
 
 export function publishStoryPanel(channel: Channel, evaluate: () => Promise<DesignPanelPayload>) {
@@ -66,10 +66,10 @@ export function publishStoryPanel(channel: Channel, evaluate: () => Promise<Desi
 
 export default {
   decorators: [
-    (Story: () => unknown, context: { parameters: Record<string, unknown> }, suppliedChannel?: Channel) => {
+    (Story: () => unknown, context: { id?: string; parameters: Record<string, unknown> }, suppliedChannel?: Channel) => {
       const settings = context.parameters.designHarness as { contract?: DesignContract; surface?: string; coverage?: Parameters<typeof collectDocument>[2]; stories?: DesignStoryMap; pages?: DesignStoryMap; controls?: Record<string, DesignStoryControls>; groups?: Partial<DesignGroups>; implementationPlatforms?: readonly DesignImplementationPlatform[] } | undefined;
       const channel = suppliedChannel ?? (globalThis as StorybookPreviewGlobal).__STORYBOOK_MODULE_PREVIEW_API__?.addons?.getChannel();
-      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls, settings.pages, settings.groups, settings.implementationPlatforms));
+      if (settings?.contract && settings.surface && channel) publishStoryPanel(channel, () => evaluateStoryPanel(settings.contract!, settings.surface!, settings.coverage, settings.stories, settings.controls, settings.pages, settings.groups, settings.implementationPlatforms, context.id));
       return Story();
     },
   ],
