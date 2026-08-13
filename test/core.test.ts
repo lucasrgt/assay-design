@@ -392,6 +392,16 @@ describe('population', () => {
       { origin: 'traveler/Card.tsx', subject: 'Card', property: 'padding', value: '12px' },
     ]);
     expect(report.findings).toEqual([{ rule: 'coherence/property-drift', category: 'coherence', path: 'Card.{padding}', message: 'Card uses 2 different padding values: 12px, 16px' }]);
+    const semantic = contract();
+    semantic.components.find((item) => item.name === 'text')!.styleBindings = [
+      { property: 'color', role: 'body', tokens: ['color.content.primary', 'color.content.secondary'] },
+    ];
+    semantic.tokens = { ...semantic.tokens, 'color.content.primary': '#111111', 'color.content.secondary': '#555555' };
+    const sanctioned = auditPopulation(semantic, [
+      { origin: 'Title.tsx', subject: 'text', component: 'text', role: 'body', property: 'color', value: 'rgb(17, 17, 17)' },
+      { origin: 'Subtitle.tsx', subject: 'text', component: 'text', role: 'body', property: 'color', value: 'rgb(85, 85, 85)' },
+    ]);
+    expect(sanctioned.findings.some((item) => item.rule === 'coherence/property-drift')).toBe(false);
     const repeated = Array.from({ length: 8 }, (_, index) => ({ origin: `a-${index}`, property: 'padding', value: '13px' }));
     const fleet = auditFleet(contract(), [
       { name: 'traveler', declarations: repeated },

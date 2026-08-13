@@ -75,6 +75,13 @@ const bindingContextMatches = (binding: DesignContract['components'][number]['st
   && (['variant', 'appearance', 'state', 'role'] as const).every((key) => !binding[key] || binding[key] === declaration[key]);
 const bindingMatches = (binding: DesignContract['components'][number]['styleBindings'][number], declaration: StyleDeclaration) =>
   governs([binding.property], declaration.property) && bindingContextMatches(binding, declaration);
+const sanctionedByBindings = (contract: DesignContract, declarations: readonly StyleDeclaration[]) => Boolean(contract.tokens) && declarations.every((declaration) => {
+  const component = contract.components.find((item) => item.name === declaration.component);
+  const candidates = component?.styleBindings.filter((binding) => bindingMatches(binding, declaration))
+    .flatMap((binding) => binding.tokens.map((name) => themedToken(name, declaration.theme, contract.tokens!))) ?? [];
+  const observed = styleKey(declaration.property, declaration.value);
+  return candidates.length > 0 && candidates.some((name) => contract.tokens?.[name] && styleKey(declaration.property, contract.tokens[name]!) === observed);
+});
 const paths = (group: string, value: string) => {
   const parts = value.split('-');
   const names = [
@@ -202,16 +209,16 @@ export function auditPopulation(contract: DesignContract, declarations: readonly
   if (!declarations.length || !tokens) return { census: [], findings: [...coverageFindings, ...tokenFindings], systematicThreshold, coverage };
   const scales = scaleIndex(contract);
   const counts = new Map<string, { group: string; value: string; count: number; origins: string[] }>();
-  const byFamily = new Map<string, Map<string, Set<string>>>();
+  const byFamily = new Map<string, Map<string, StyleDeclaration[]>>();
 
   for (const declaration of declarations) {
     const family = declaration.subject ? `${declaration.subject}${declaration.context ? `@${declaration.context}` : ''}` : undefined;
     if (family) {
-      const values = byFamily.get(family) ?? new Map<string, Set<string>>();
+      const values = byFamily.get(family) ?? new Map<string, StyleDeclaration[]>();
       byFamily.set(family, values);
-      const set = values.get(declaration.property) ?? new Set<string>();
-      set.add(declaration.value.toLowerCase());
-      values.set(declaration.property, set);
+      const observations = values.get(declaration.property) ?? [];
+      observations.push(declaration);
+      values.set(declaration.property, observations);
     }
 
     for (const { group, properties, values: scale } of scales) {
@@ -237,8 +244,10 @@ export function auditPopulation(contract: DesignContract, declarations: readonly
     findings.push({ rule: 'tokens/off-scale-one-off', category: 'scale', path: entry.origins[0] ?? entry.value, message: `"${entry.value}" is an off-scale ${entry.group} one-off (${entry.count} use${entry.count === 1 ? '' : 's'})` });
   }
 
-  for (const [family, properties] of byFamily) for (const [property, values] of properties) {
+  for (const [family, properties] of byFamily) for (const [property, declarations] of properties) {
+    const values = new Set(declarations.map((declaration) => declaration.value.toLowerCase()));
     if (values.size < 2) continue;
+    if (sanctionedByBindings(contract, declarations)) continue;
     const list = [...values].sort();
     findings.push({ rule: 'coherence/property-drift', category: 'coherence', path: `${family}.{${property}}`, message: `${family} uses ${list.length} different ${property} values: ${list.join(', ')}` });
   }
